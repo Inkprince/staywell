@@ -1,0 +1,34 @@
+{
+  "name": "proof",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI agents can act. Proof makes sure they actually did.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "next dev --port 3210",
+    "build": "next build",
+    "start": "next start --port 3210",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "evals": "tsx evals/runner.ts"
+  },
+  "dependencies": {
+    "next": "^16.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^30.0.1",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

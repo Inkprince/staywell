@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+
+/*
+ * Proof's design tokens.
+ *
+ * Palette: a warm ivory ground, almost-black charcoal text,
+ * muted stone for secondary copy, and a single signature colour — deep cobalt —
+ * chosen for confidence and precision rather than because it reads as "AI".
+ * Status colours are deliberately restrained: a sophisticated green, a warm
+ * amber, and a muted red rather than an alarming neon one.
+ *
+ * Status is never communicated by colour alone anywhere in the product; every
+ * state also carries an icon and a label.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Surfaces */
+  --color-canvas: #faf9f6;
+  --color-surface: #ffffff;
+  --color-sunken: #f3f1ec;
+  --color-line: #e5e2db;
+  --color-line-strong: #d3cfc5;
+
+  /* Text */
+  --color-ink: #191a1c;
+  --color-ink-muted: #5c5e66;
+  --color-ink-subtle: #8a8c94;
+
+  /* Signature */
+  --color-cobalt: #1b45c4;
+  --color-cobalt-hover: #163aa8;
+  --color-cobalt-soft: #e9edfc;
+  --color-cobalt-line: #c3cff5;
+
+  /* Status */
+  --color-verified: #156a48;
+  --color-verified-soft: #e6f2eb;
+  --color-verified-line: #b7dcc7;
+
+  --color-caution: #93610f;
+  --color-caution-soft: #fbf1de;
+  --color-caution-line: #ecd5a6;
+
+  --color-mismatch: #9d3a2c;
+  --color-mismatch-soft: #fbeae6;
+  --color-mismatch-line: #eec4b9;
+
+  /* Type */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), Georgia, serif;
+
+  /* Motion — every transition respects prefers-reduced-motion below. */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.dark {
+  --color-canvas: #101113;
+  --color-surface: #191a1d;
+  --color-sunken: #0b0c0e;
+  --color-line: #292b30;
+  --color-line-strong: #3a3d44;
+
+  --color-ink: #f2f0ea;
+  --color-ink-muted: #a2a4ac;
+  --color-ink-subtle: #74767e;
+
+  --color-cobalt: #829ef8;
+  --color-cobalt-hover: #9bb1fa;
+  --color-cobalt-soft: #182142;
+  --color-cobalt-line: #2c3a6b;
+
+  --color-verified: #56c191;
+  --color-verified-soft: #12241c;
+  --color-verified-line: #24493a;
+
+  --color-caution: #dda94a;
+  --color-caution-soft: #241d10;
+  --color-caution-line: #4a3b1d;
+
+  --color-mismatch: #e58370;
+  --color-mismatch-soft: #251512;
+  --color-mismatch-line: #4d2a22;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * A single, visible focus treatment across the product. The whole thesis is
+   * about human control, so the keyboard path is designed rather than inherited.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background-color: var(--color-cobalt-soft);
+    color: var(--color-ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Screen-reader-only, used for status announcements paired with visual changes. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}

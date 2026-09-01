@@ -1,0 +1,13 @@
+The file `public/webmcp-polyfill.js` is vendored verbatim from:
+
+  https://github.com/GoogleChromeLabs/webmcp-tools
+  demos/shared/webmcp-polyfill.js
+
+  Copyright 2026 Google LLC
+  SPDX-License-Identifier: Apache-2.0
+
+It is loaded by Proof only when the browser does not natively implement
+`document.modelContext`, so that the product remains usable (and its agent
+surface remains inspectable) in browsers without WebMCP support.
+
+No modifications have been made to the vendored file.

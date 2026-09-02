@@ -14,10 +14,18 @@ export type JSONSchema = {
   required?: readonly string[];
   items?: JSONSchema;
   enum?: readonly unknown[];
+  const?: unknown;
   default?: unknown;
   minimum?: number;
   maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
   pattern?: string;
+  oneOf?: readonly JSONSchema[];
   additionalProperties?: boolean | JSONSchema;
 };
 

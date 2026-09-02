@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { existingWorkspaceFor, saveWorkspace, WorkspaceError } from '@/lib/http/workspace-access';
+import { taskView } from '@/lib/http/task-view';
 import { startTask } from '@/lib/proof/transaction';
 
 /**
@@ -43,42 +44,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 }
 
 // ---------------------------------------------------------------------------
-
-/**
- * The client- and agent-visible shape of a task. Notably *excludes* approval
- * nonces and any store internals — the tool surface renders from this, so
- * nothing private can leak through it.
- */
-export function taskView(task: import('@/lib/proof/task').ProofTask) {
-  return {
-    id: task.id,
-    goal: task.goal,
-    state: task.state,
-    revision: task.revision,
-    constraints: task.constraints,
-    staged: task.staged
-      ? {
-          id: task.staged.id,
-          request: task.staged.request,
-          quote: task.staged.quote,
-          rationale: task.staged.rationale ?? null,
-          baseRevision: task.staged.baseRevision,
-          stagedAt: task.staged.stagedAt,
-        }
-      : null,
-    verification: task.verification
-      ? {
-          matched: task.verification.result.matched,
-          verdicts: task.verification.result.verdicts,
-          unexpectedChanges: task.verification.result.unexpectedChanges,
-          checkedAt: task.verification.verifiedAt,
-        }
-      : null,
-    approved: task.approvals.length > 0,
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-  };
-}
 
 async function readJson(request: Request): Promise<unknown> {
   try {

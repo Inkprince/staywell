@@ -5,9 +5,11 @@ import {
   getQuote,
   setConstraints,
   stageChange,
+  stageRecovery,
   verifyResult,
   snapshotOf,
 } from '@/lib/proof/transaction';
+import { taskView } from '@/lib/http/task-view';
 import type { Constraint } from '@/lib/proof/constraints';
 import { CONSTRAINT_KINDS } from '@/lib/proof/constraints';
 
@@ -47,7 +49,7 @@ export async function POST(
         const next = setConstraints(workspace, taskId, constraints, baseRevision);
         saveWorkspace(next);
         const updated = next.tasks.find((t) => t.id === taskId)!;
-        return NextResponse.json({ task: publicTask(updated) });
+        return NextResponse.json({ task: taskView(updated) });
       }
 
       case 'quote_change': {
@@ -64,14 +66,14 @@ export async function POST(
           baseRevision,
         });
         saveWorkspace(staged.workspace);
-        return NextResponse.json({ task: publicTask(staged.task), change: staged.change });
+        return NextResponse.json({ task: taskView(staged.task), change: staged.change });
       }
 
       case 'verify_result': {
         const verified = verifyResult(workspace, taskId);
         saveWorkspace(verified.workspace);
         return NextResponse.json({
-          task: publicTask(verified.task),
+          task: taskView(verified.task),
           verification: {
             matched: verified.verification.matched,
             verdicts: verified.verification.verdicts,
@@ -105,13 +107,13 @@ export async function POST(
           return NextResponse.json({ error: `no recovery option "${optionId}"` }, { status: 404 });
         }
 
-        const staged = stageChange(workspace, taskId, option.request, {
-          rationale: option.summary,
-          baseRevision: workspace.world.revision,
+        const staged = stageRecovery(workspace, taskId, {
+          request: option.request,
+          summary: option.summary,
         });
         saveWorkspace(staged.workspace);
         return NextResponse.json({
-          task: publicTask(staged.task),
+          task: taskView(staged.task),
           change: staged.change,
           option: {
             id: option.id,
@@ -265,38 +267,6 @@ function parseConstraints(value: unknown): Constraint[] {
   return constraints;
 }
 
-/** Everything a tool or the interface may see. No nonces, no store internals. */
-function publicTask(task: import('@/lib/proof/task').ProofTask) {
-  return {
-    id: task.id,
-    goal: task.goal,
-    state: task.state,
-    revision: task.revision,
-    constraints: task.constraints,
-    staged: task.staged
-      ? {
-          id: task.staged.id,
-          request: task.staged.request,
-          quote: task.staged.quote,
-          rationale: task.staged.rationale ?? null,
-          baseRevision: task.staged.baseRevision,
-          stagedAt: task.staged.stagedAt,
-        }
-      : null,
-    verification: task.verification
-      ? {
-          matched: task.verification.result.matched,
-          verdicts: task.verification.result.verdicts,
-          unexpectedChanges: task.verification.result.unexpectedChanges,
-          checkedAt: task.verification.verifiedAt,
-        }
-      : null,
-    approved: task.approvals.length > 0,
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-  };
-}
-
 /** Read-only view of the reservation the tools will be asked about. */
 export async function GET(
   request: Request,
@@ -312,7 +282,7 @@ export async function GET(
       (r) => r.id === task.staged?.request.reservationId,
     );
     return NextResponse.json({
-      task: publicTask(task),
+      task: taskView(task),
       reservation: reservation ? snapshotOf(reservation) : null,
     });
   } catch (cause) {

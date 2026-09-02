@@ -303,6 +303,109 @@ export function approveChange(
 }
 
 // ---------------------------------------------------------------------------
+// Human decisions after a caught mismatch
+
+/**
+ * "Keep this change" — the human accepts the result despite a constraint it
+ * broke. Nothing further happens to the world; the task closes honestly as
+ * accepted-with-exceptions, and the receipt says exactly which ask went unmet.
+ */
+export function acceptResult(workspace: Workspace, taskId: string): {
+  workspace: Workspace;
+  task: ProofTask;
+} {
+  const task = findTask(workspace, taskId);
+  if (!task.verification) throw new Error('nothing has been checked yet to accept');
+
+  const accepted = step(task, 'accept'); // MISMATCH/RECOVERING → ACCEPTED_WITH_EXCEPTIONS
+  let next: Workspace = updateTask(workspace, taskId, () => ({
+    ...accepted,
+    updatedAt: nowIso(),
+  }));
+  next = {
+    ...next,
+    audit: appendAudit(next.audit, { type: 'accepted_with_exceptions', taskId, at: nowIso() }),
+  };
+
+  return { workspace: next, task: next.tasks.find((t) => t.id === taskId)! };
+}
+
+/**
+ * Stages one of the recovery options — "find another option" or "undo it" —
+ * walking the task back through REPLANNING so the change arrives in review by
+ * the same gate as any other: it is applied only after the human approves it.
+ */
+export function stageRecovery(
+  workspace: Workspace,
+  taskId: string,
+  option: { request: StagedChange['request']; summary: string },
+): { workspace: Workspace; task: ProofTask; change: StagedChange } {
+  const task = findTask(workspace, taskId);
+
+  let base = workspace;
+  if (task.state === 'MISMATCH' || task.state === 'RECOVERING') {
+    // replan covers both; from here `stage` is legal again.
+    base = updateTask(base, taskId, (t) => ({
+      ...step(t, 'replan'),
+      updatedAt: nowIso(),
+    }));
+  }
+
+  const staged = stageChange(base, taskId, option.request, {
+    rationale: option.summary,
+    baseRevision: base.world.revision,
+  });
+
+  let next: Workspace = {
+    ...staged.workspace,
+    audit: appendAudit(staged.workspace.audit, {
+      type: 'recovery_offered',
+      taskId,
+      options: [option.summary],
+      at: nowIso(),
+    }),
+  };
+
+  return {
+    workspace: next,
+    task: next.tasks.find((t) => t.id === taskId)!,
+    change: staged.change,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Other human-only steps
+
+/** "Not yet" — the human sends a staged change back to the drawing board. */
+export function declineStaged(workspace: Workspace, taskId: string): {
+  workspace: Workspace;
+  task: ProofTask;
+} {
+  const task = findTask(workspace, taskId);
+  const declined = step(task, 'request_changes'); // READY_FOR_REVIEW → PLANNING
+  const next: Workspace = updateTask(workspace, taskId, () => ({
+    ...declined,
+    staged: null,
+    updatedAt: nowIso(),
+  }));
+  return { workspace: next, task: next.tasks.find((t) => t.id === taskId)! };
+}
+
+/** The human walked away. Terminal, and honest about it. */
+export function abandonTask(workspace: Workspace, taskId: string): {
+  workspace: Workspace;
+  task: ProofTask;
+} {
+  const task = findTask(workspace, taskId);
+  const abandoned = step(task, 'abandon');
+  const next: Workspace = updateTask(workspace, taskId, () => ({
+    ...abandoned,
+    updatedAt: nowIso(),
+  }));
+  return { workspace: next, task: next.tasks.find((t) => t.id === taskId)! };
+}
+
+// ---------------------------------------------------------------------------
 // Commit and verify: the application's job, then the checker's
 
 export interface CommitOutcomeRecord {

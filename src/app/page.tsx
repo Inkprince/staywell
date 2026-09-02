@@ -24,8 +24,14 @@ export default function HomePage() {
       </p>
       <div className="mt-10 flex flex-wrap gap-4">
         <Link
+          href="/workspace"
+          className="rounded-md bg-cobalt px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-cobalt-hover"
+        >
+          Try Proof
+        </Link>
+        <Link
           href="/agent-check"
-          className="rounded-md bg-cobalt px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-cobalt-hover"
+          className="rounded-md border border-line px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-sunken"
         >
           Agent diagnostics
         </Link>

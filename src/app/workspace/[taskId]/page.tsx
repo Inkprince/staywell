@@ -21,6 +21,7 @@ import type { RecoveryOption } from '@/lib/proof/recovery';
 import { toolsForTask } from '@/webmcp/tools';
 import { useWebMCPTools } from '@/webmcp/use-webmcp';
 import { useTask } from '@/features/workspace/use-task';
+import { PilotPanel } from '@/features/workspace/pilot-panel';
 import {
   STATE_LABELS,
   describeChange,
@@ -41,7 +42,7 @@ export default function TaskPage({
 }) {
   const { taskId } = use(params);
   const { inspect } = use(searchParams);
-  const { bundle, error, busy, approve, decide, loadRecoveryOptions } = useTask(taskId);
+  const { bundle, error, busy, refresh, approve, decide, loadRecoveryOptions } = useTask(taskId);
   const [inspectOpen, setInspectOpen] = useState(inspect === '1');
   const [showHappening, setShowHappening] = useState(false);
 
@@ -112,7 +113,7 @@ export default function TaskPage({
         ) : null}
 
         {['NEW', 'UNDERSTANDING', 'PLANNING', 'REPLANNING'].includes(task.state) ? (
-          <WorkingState task={task} />
+          <WorkingState task={task} taskId={taskId} refresh={refresh} />
         ) : null}
 
         {task.state === 'READY_FOR_REVIEW' && staged ? (
@@ -274,7 +275,15 @@ function WhatsHappening({ timeline }: { timeline: { label: string; at: string }[
   );
 }
 
-function WorkingState({ task }: { task: PublicTask }) {
+function WorkingState({
+  task,
+  taskId,
+  refresh,
+}: {
+  task: PublicTask;
+  taskId: string;
+  refresh: () => void;
+}) {
   return (
     <section className="mt-10 rounded-xl border border-line bg-surface p-8">
       <p className="text-ink-muted">
@@ -286,6 +295,7 @@ function WorkingState({ task }: { task: PublicTask }) {
         When a change is ready, it waits here for your decision. Nothing happens to your
         booking until you say so.
       </p>
+      <PilotPanel taskId={taskId} onDone={refresh} />
     </section>
   );
 }

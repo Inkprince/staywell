@@ -14,17 +14,10 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
-
-interface StreamedStep {
-  engine?: string;
-  taskId?: string;
-  note?: string;
-  path?: string;
-  outcome?: 'ok' | 'error' | 'needs-you';
-}
+import { streamPilot, type PilotStreamStep } from './pilot-stream';
 
 export function PilotPanel({ taskId, onDone }: { taskId: string; onDone: () => void }) {
-  const [steps, setSteps] = useState<StreamedStep[]>([]);
+  const [steps, setSteps] = useState<PilotStreamStep[]>([]);
   const [engine, setEngine] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [started, setStarted] = useState(false);
@@ -38,59 +31,15 @@ export function PilotPanel({ taskId, onDone }: { taskId: string; onDone: () => v
 
     const controller = new AbortController();
     abortRef.current = controller;
+    const { engine: used } = await streamPilot(
+      taskId,
+      (step) => setSteps((prev) => [...prev, step]),
+      controller.signal,
+    );
+    if (used) setEngine(used);
 
-    try {
-      const response = await fetch('/api/pilot', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ taskId }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok || !response.body) {
-        let why = `the pilot could not start (${response.status})`;
-        try {
-          const body = (await response.json()) as { error?: string };
-          if (body.error) why = body.error;
-        } catch {
-          // keep the status-line message
-        }
-        setSteps([{ note: why, outcome: 'error' }]);
-      } else {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const step = JSON.parse(line) as StreamedStep;
-              if (!step.note) {
-                // The opening line: which engine is running.
-                if (step.engine) setEngine(step.engine);
-                continue;
-              }
-              setSteps((prev) => [...prev, step]);
-            } catch {
-              // A partial line never reaches us — buffer holds it back.
-            }
-          }
-        }
-      }
-    } catch {
-      if (!controller.signal.aborted) {
-        setSteps((prev) => [...prev, { note: 'The connection dropped. Nothing was changed.', outcome: 'error' }]);
-      }
-    } finally {
-      setRunning(false);
-      onDone();
-    }
+    setRunning(false);
+    onDone();
   }, [taskId, onDone]);
 
   return (

@@ -498,6 +498,8 @@ export function verifyResult(workspace: Workspace, taskId: string): {
   );
   const result = verify(task.constraints, staged.before, observed, {
     revision: workspace.world.revision,
+    // The fields this approved request changes are part of the ask (§12).
+    request: staged.request,
   });
 
   const verified = step(task, result.matched ? 'match' : 'mismatch');

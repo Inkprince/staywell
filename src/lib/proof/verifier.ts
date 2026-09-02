@@ -107,10 +107,17 @@ function checkConstraint(
 /**
  * The fields a change is *allowed* to touch: those named by the constraints
  * themselves (a `date_equals` implies the date may change; an explicit
- * `unchanged('guestName')` pins the guest). Everything else that differs
- * between `before` and `observed` is an unexpected change.
+ * `unchanged('guestName')` pins the guest), plus — when the staged request is
+ * supplied — the fields that request itself changes. Those were on the review
+ * card the human approved, so they are asked-for, not unexpected: without
+ * this, a recovery move to another room could never verify. Everything else
+ * that differs between `before` and `observed` is an unexpected change.
  */
-function permittedFields(constraints: readonly Constraint[]): Set<ConstraintField> {
+function permittedFields(
+  constraints: readonly Constraint[],
+  before: ReservationSnapshot,
+  request?: { roomId: string; checkIn: string; nights: number },
+): Set<ConstraintField> {
   const permitted = new Set<ConstraintField>();
   for (const constraint of constraints) {
     switch (constraint.kind) {
@@ -127,6 +134,12 @@ function permittedFields(constraints: readonly Constraint[]): Set<ConstraintFiel
         // Explicitly pinned, never "permitted" to drift.
         break;
     }
+  }
+  if (request) {
+    // A field the approved request itself changes is asked-for, not unexpected.
+    if (request.roomId !== before.roomId) permitted.add('roomId');
+    if (request.checkIn !== before.checkIn) permitted.add('checkIn');
+    if (request.nights !== before.nights) permitted.add('nights');
   }
   return permitted;
 }
@@ -147,18 +160,25 @@ const ALL_FIELDS: ConstraintField[] = [
  * after it, against the constraints the human actually set.
  *
  * `matched` is `true` only when every constraint holds and no unrequested
- * field changed. The revision is carried through, not generated here, so a
- * result computed against a stale revision can be rejected downstream.
+ * field changed. When `request` is supplied it is the staged change the human
+ * approved — the fields it names are part of the ask, so their changing is
+ * expected. The revision is carried through, not generated here, so a result
+ * computed against a stale revision can be rejected downstream.
  */
 export function verify(
   constraints: readonly Constraint[],
   before: ReservationSnapshot,
   observed: ReservationSnapshot,
-  options: { revision: number; checkedAt?: string },
+  options: {
+    revision: number;
+    checkedAt?: string;
+    /** The staged request behind this change, when there is one. */
+    request?: { roomId: string; checkIn: string; nights: number };
+  },
 ): VerificationResult {
   const verdicts = constraints.map((c) => checkConstraint(c, observed, before));
 
-  const permitted = permittedFields(constraints);
+  const permitted = permittedFields(constraints, before, options.request);
   const unexpectedChanges: UnexpectedChange[] = ALL_FIELDS.filter((field) => {
     if (permitted.has(field)) return false;
     return before[field] !== observed[field];

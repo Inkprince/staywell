@@ -120,3 +120,55 @@ describe('verify — status changes are visible', () => {
     ]);
   });
 });
+
+describe('verify — fields the approved request itself changes', () => {
+  // The staged request is what the human approved on the review card, so a
+  // field it changes is asked-for, never "unexpected". Without this, a
+  // recovery move to another room could never come out verified.
+  it('permits a room change the request names, when no constraint governs the room', () => {
+    const observed: ReservationSnapshot = { ...MOVED_AND_PRICED_294, roomId: '401' };
+    const constraints = [
+      { kind: 'date_equals', date: '2026-09-04' },
+      { kind: 'price_at_most', amount: 300 },
+    ] as const;
+
+    const result = verify(constraints, BEFORE, observed, {
+      revision: 11,
+      request: { roomId: '401', checkIn: '2026-09-04', nights: 2 },
+    });
+
+    expect(result.unexpectedChanges).toEqual([]);
+    expect(result.matched).toBe(true);
+  });
+
+  it('does not permit what the request leaves alone — the price can still drift into view', () => {
+    const observed: ReservationSnapshot = { ...MOVED_AND_PRICED_319, roomId: '401' };
+    const constraints = [{ kind: 'date_equals', date: '2026-09-04' }] as const;
+
+    const result = verify(constraints, BEFORE, observed, {
+      revision: 11,
+      request: { roomId: '401', checkIn: '2026-09-04', nights: 2 },
+    });
+
+    // The room was asked for; the price was not — and it moved.
+    expect(result.unexpectedChanges).toEqual([
+      { field: 'totalPrice', before: 294, after: 319 },
+    ]);
+  });
+
+  it('a request that keeps a field unchanged does not permit that field', () => {
+    const observed: ReservationSnapshot = { ...MOVED_AND_PRICED_294, nights: 1 };
+    const constraints = [{ kind: 'price_at_most', amount: 400 }] as const;
+
+    const result = verify(constraints, BEFORE, observed, {
+      revision: 11,
+      request: { roomId: '418', checkIn: '2026-09-03', nights: 2 }, // nights unchanged
+    });
+
+    expect(result.unexpectedChanges).toContainEqual({
+      field: 'nights',
+      before: 2,
+      after: 1,
+    });
+  });
+});

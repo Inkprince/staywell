@@ -15,10 +15,10 @@ Minimal sequence on any host with Node 20+ and pnpm:
 ```bash
 pnpm install --frozen-lockfile
 pnpm build
-pnpm start        # serves on :3210; put HTTPS/TLS in front of it
+pnpm start        # binds the PORT your host assigns, or :3000 locally
 ```
 
-Set the port with `PORT` if your platform assigns one (`next start` honours it).
+`next start` reads `PORT` automatically; platforms that assign it (Render, Fly.io, Railway) need no extra configuration.
 
 ## The single-instance requirement (read this part)
 
@@ -31,6 +31,18 @@ Consequences, stated plainly:
 - **For a durable or multi-instance deployment**, swap the in-memory store for a shared one first. Every consumer goes through the same accessors, so that change is localised — but it is not done, and nothing in this repo should be presented as if it were.
 
 Recommended single-instance hosts: a single Fly.io machine, a single Railway/Render service (with scaling pinned to 1), or any VM/container running one `next start` process behind TLS. On Render: New → Web Service, connect the repo, build `pnpm install --frozen-lockfile && pnpm build`, start `pnpm start`, instance count 1. The images are self-hosted under `public/images/`, so the deployment makes no calls to third-party CDNs.
+
+### The free tier, and staying awake
+
+Render's free web service sleeps after ~15 minutes without inbound traffic, and a cold start takes roughly a minute. For this app a restart is harmless — the first visitor afterwards gets a fresh session seeded to the canonical demo world — but the wait is worth avoiding while judges are looking.
+
+The fix costs nothing: point a free uptime monitor ([UptimeRobot](https://uptimerobot.com), cron-job.org) at
+
+```
+https://your-host/api/health
+```
+
+every 10 minutes. The endpoint reports liveness and nothing else — no workspace is created, no session minted, no trace in the store — so the pings keep the instance warm without polluting the demo. A monitor running at a 10-minute interval keeps the service from ever reaching the 15-minute sleep threshold.
 
 ## Sessions in embedded browsers
 
@@ -64,3 +76,4 @@ If step 4 shows anything other than native mode inside ChatGPT, do not hand judg
 | `/workspace` | Start a task in your own words. |
 | `/workspace/{taskId}` | The task screen: four layers, approval card, mismatch + recovery. |
 | `/agent-check` | Judge preflight: pass/fail on the native WebMCP surface, the ChatGPT test flow, the withheld list, and the provenance-labelled call log. |
+| `/api/health` | Liveness probe for uptime monitors. Side-effect free by design. |

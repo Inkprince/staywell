@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isSameOrigin } from '@/lib/http/same-origin';
+import { isSameOrigin, publicOrigin } from '@/lib/http/same-origin';
 import type { PilotClient } from '@/lib/pilot/scripted';
 import { runScriptedPilot } from '@/lib/pilot/scripted';
 import { runOpenAiPilot } from '@/lib/pilot/openai';
@@ -117,7 +117,10 @@ export async function POST(request: Request): Promise<Response> {
  * cookies, no internal imports. The pilot genuinely is just another client.
  */
 function forwardClient(request: Request): PilotClient {
-  const origin = new URL(request.url).origin;
+  // The origin the caller actually arrived on — behind a proxy, request.url
+  // is the internal address, so self-calls would aim at a host nothing can
+  // reach. publicOrigin() resolves to the public address the browser used.
+  const origin = publicOrigin(request);
   const cookie = request.headers.get('cookie') ?? '';
 
   async function call(path: string, init?: RequestInit): Promise<unknown> {

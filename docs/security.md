@@ -43,6 +43,7 @@ The Checker (`lib/proof/verifier.ts`) is deterministic code — never a model �
 
 ## Known limits (stated honestly)
 
+- An agent with control of the user's browser can operate the human interface — click any button the user could click, including self-service forms. The tool surface never grants approval powers, and no click can forge what the server's own checks do, but a browsing agent acting with the user's consent can drive the plain guest flows. The self-service edit form asks for a press-and-hold to confirm: a deliberate gesture a single synthetic click cannot perform. That is friction, not proof of humanity, and it is not claimed as more.
 - The store is in-memory per server process; a restart loses demo state. Acceptable for a simulated hotel, and the store is a single swappable module.
-- The nonce travels over HTTP to the client in dev; production should be HTTPS (it is, on Vercel).
+- The nonce travels over HTTP to the client in dev; production should be HTTPS (it is, on Render).
 - Rate limiting is per server instance; a multi-instance deploy would move the counters to a shared store (`rate-limit.ts` marks the seam).

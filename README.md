@@ -56,7 +56,8 @@ This demo currently uses an in-memory store. Deploy it as one long-lived Node in
 ## Project notes
 
 - [Architecture](docs/architecture.md)
-- [WebMCP contract](docs/webmcp.md)
+- [The WebMCP contract](docs/webmcp.md)
 - [Security model](docs/security.md)
+- [Design decisions](docs/decisions.md)
 
 Apache-2.0 licensed. See [LICENSE](LICENSE).

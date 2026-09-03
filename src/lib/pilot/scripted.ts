@@ -280,7 +280,7 @@ async function* planAndStage(
 
   if (parsed.constraints.length === 0) {
     yield {
-      note: 'I could not turn that request into checkable conditions. Try naming a day, a room, or a price — or ask in your own words what you want true at the end.',
+      note: 'I could not turn that request into checkable conditions. Try naming a day, a room, a length, or a price — or bring your own agent: this page is a WebMCP server, so ChatGPT can drive these same tools with none of my vocabulary limits.',
       outcome: 'needs-you',
       detail: { understood: parsed.understood },
     };

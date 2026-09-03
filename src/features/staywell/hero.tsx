@@ -1,13 +1,11 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { motion, type Variants } from 'motion/react';
 import Link from 'next/link';
 import type { Route } from 'next';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Play } from 'lucide-react';
 import { StayWellNav } from '@/features/staywell/staywell-nav';
-import { ProofConsole } from '@/features/proof/proof-console';
 
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 40 },
@@ -21,15 +19,16 @@ const stagger: Variants = {
 const STAYS = '/stays' as Route;
 const RESERVATIONS = '/reservations' as Route;
 
-const DEMO_GOAL = 'Move my stay to Friday for two nights, under $300.';
-
-const ASSURANCES = ['Live rooms, live prices', 'Demo checkout — nothing real is charged', 'Every change checked, every time'];
+/**
+ * The tour video on YouTube. Set the id when it goes live; until then
+ * the frame shows a poster.
+ */
+const VIDEO_ID = '';
 
 /**
- * The hero: the product, running. Full-bleed and a full viewport tall, the
- * headline earns the click and the chat beside it is a real task on a real
- * reservation — one sentence from a visitor to a prepared change they get to
- * approve. The floating glass chips are the loop, spelled in ornaments.
+ * The hero: full-bleed and a full viewport tall, the headline earns the click
+ * and the tour video beside it carries the story in three minutes. The live
+ * chat is never far — one "Ask Proof" click away on every page.
  */
 export function Hero() {
   return (
@@ -99,18 +98,6 @@ export function Hero() {
                 See your stay
               </Link>
             </motion.div>
-
-            <motion.ul variants={fadeInUp} className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/75">
-              {ASSURANCES.map((line) => (
-                <li key={line} className="flex items-center gap-2.5">
-                  <span
-                    aria-hidden
-                    className="size-1.5 shrink-0 rounded-full bg-white shadow-[0_0_10px_white]"
-                  />
-                  {line}
-                </li>
-              ))}
-            </motion.ul>
           </motion.div>
 
           <motion.div
@@ -120,54 +107,40 @@ export function Hero() {
             className="min-w-0"
           >
             <p className="mb-3 text-right text-[11px] font-medium tracking-[0.2em] text-white/60 uppercase">
-              Live — not a video. Try it →
+              The whole loop — three minutes
             </p>
-            <div className="group relative">
-              <div className="h-[600px] max-h-[calc(100svh-13rem)]">
-                <ProofConsole defaultGoal={DEMO_GOAL} />
-              </div>
-
-              {/* The loop, spelled in glass — pure ornament, Glamour-style */}
-              <OrnamentChip className="top-16 -left-4" delay={1}>
-                Live prices
-              </OrnamentChip>
-              <OrnamentChip className="top-1/2 -left-12" delay={1.2}>
-                You approve
-              </OrnamentChip>
-              <OrnamentChip className="bottom-20 -left-6" delay={1.4}>
-                Checked, always
-              </OrnamentChip>
+            <div className="relative aspect-video w-full overflow-hidden rounded-[2rem] border border-white/15 shadow-2xl">
+              {VIDEO_ID ? (
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${VIDEO_ID}?rel=0`}
+                  title="StayWell, with Proof — the three-minute tour"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="absolute inset-0 size-full"
+                />
+              ) : (
+                <>
+                  <Image
+                    src="/images/photo-1521587760476-6c12a4b040da.jpg"
+                    alt="The StayWell reading room, a quiet pause on the tour"
+                    fill
+                    sizes="(min-width: 1024px) 850px, 100vw"
+                    className="object-cover brightness-[0.6]"
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 text-center">
+                    <span className="flex size-16 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur-md">
+                      <Play size={20} aria-hidden className="translate-x-0.5" />
+                    </span>
+                    <p className="text-xs font-medium tracking-[0.22em] text-white/75 uppercase">
+                      The StayWell tour
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         </div>
       </div>
     </section>
-  );
-}
-
-/** A floating glass label with a glowing dot, drifting outward on hover. */
-function OrnamentChip({
-  children,
-  className,
-  delay,
-}: {
-  children: ReactNode;
-  className: string;
-  delay: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay }}
-      className={`pointer-events-none absolute z-10 hidden items-center gap-2.5 transition-transform duration-500 group-hover:-translate-x-3 xl:flex ${className}`}
-      aria-hidden
-    >
-      <span className="rounded-full border border-white/15 bg-black/25 px-3 py-1 text-xs font-medium tracking-wide text-white backdrop-blur-md">
-        {children}
-      </span>
-      <span className="size-2 shrink-0 rounded-full bg-white shadow-[0_0_10px_white]" />
-      <span className="h-px w-10 bg-gradient-to-r from-white/80 to-transparent" />
-    </motion.div>
   );
 }

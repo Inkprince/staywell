@@ -38,6 +38,9 @@ const SUGGESTIONS = [
   'Make it one night shorter',
 ];
 
+/** The canonical demo ask — pre-filled so the demo is one send away anywhere. */
+const DEFAULT_GOAL = 'Move my stay to Friday for two nights, under $300.';
+
 const GREETING =
   "Hi — I'm Proof, your agent for this stay. Ask for any change in your own words: I'll prepare it, you approve it, and StayWell checks the result before anyone calls it done.";
 
@@ -60,7 +63,7 @@ type Entry =
   | { id: number; kind: 'error'; text: string; retry?: string };
 
 export function ProofConsole({
-  defaultGoal = '',
+  defaultGoal = DEFAULT_GOAL,
   onClose,
 }: {
   defaultGoal?: string;

@@ -13,7 +13,7 @@ The main StayWell flow is real and connected:
 1. Visit `/stays` to choose dates, compare five room collections, and see live prices.
 2. Book a room and pay for it — the demo checkout offers demo cards, Apple Pay, or pay-at-the-hotel. No real money moves; the paid/unpaid state is real.
 3. Open the reservation in `/reservations`.
-4. Ask Proof for help — from the reservation page, from the **Ask Proof** button that follows you around the site, or straight from the live chat on the homepage.
+4. Ask Proof for help — from the reservation page, or from the **Ask Proof** button that follows you around the site (the canonical ask is already in the box).
 5. Ask: _"Move my stay to Friday for two nights, under $300."_
 6. The agent plans and stages a change. A person approves it.
 7. StayWell applies the change and reads its state again.

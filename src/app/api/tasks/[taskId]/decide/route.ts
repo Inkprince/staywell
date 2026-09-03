@@ -6,6 +6,7 @@ import {
   stageRecovery,
 } from '@/lib/proof/transaction';
 import { findRecoveryOptions } from '@/lib/proof/recovery';
+import { isSameOrigin } from '@/lib/http/same-origin';
 import { existingWorkspaceFor, saveWorkspace, WorkspaceError } from '@/lib/http/workspace-access';
 import { taskView } from '@/lib/http/task-view';
 
@@ -96,17 +97,6 @@ export async function POST(
     }
   } catch (cause) {
     return errorResponse(cause);
-  }
-}
-
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  if (!origin) return true; // same-origin fetches may omit the header
-  try {
-    const url = new URL(request.url);
-    return new URL(origin).origin === url.origin;
-  } catch {
-    return false;
   }
 }
 

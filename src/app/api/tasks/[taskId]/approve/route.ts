@@ -6,6 +6,7 @@ import {
   verifyResult,
 } from '@/lib/proof/transaction';
 import type { Workspace } from '@/lib/store/memory';
+import { isSameOrigin } from '@/lib/http/same-origin';
 import { existingWorkspaceFor, saveWorkspace, WorkspaceError } from '@/lib/http/workspace-access';
 
 /**
@@ -24,21 +25,6 @@ import { existingWorkspaceFor, saveWorkspace, WorkspaceError } from '@/lib/http/
  *   runs verification. The caller of POST is the browser form; the actor of
  *   the commit is Proof.
  */
-
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  if (!origin) {
-    // Same-origin fetches and form posts may omit the header; Next's own
-    // CSRF layer already gates non-GET cross-origin requests.
-    return true;
-  }
-  try {
-    const url = new URL(request.url);
-    return new URL(origin).origin === url.origin;
-  } catch {
-    return false;
-  }
-}
 
 export async function GET(
   request: Request,

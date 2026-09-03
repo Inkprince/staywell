@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isSameOrigin } from '@/lib/http/same-origin';
 import { existingWorkspaceFor, saveWorkspace, WorkspaceError } from '@/lib/http/workspace-access';
 import { bookReservation, quoteStay, stayDates, UnavailableError, CapacityError } from '@/lib/staywell/world';
 import { collectionForRoom } from '@/lib/staywell/catalog';
@@ -60,12 +61,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     return errorResponse(cause);
   }
-}
-
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  if (!origin) return true;
-  return origin === new URL(request.url).origin;
 }
 
 async function readJson(request: Request): Promise<unknown> {

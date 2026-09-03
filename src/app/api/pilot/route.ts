@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isSameOrigin } from '@/lib/http/same-origin';
 import type { PilotClient } from '@/lib/pilot/scripted';
 import { runScriptedPilot } from '@/lib/pilot/scripted';
 import { runOpenAiPilot } from '@/lib/pilot/openai';
@@ -158,15 +159,4 @@ function forwardClient(request: Request): PilotClient {
     get: (path) => call(path),
     post: (path, body) => call(path, { method: 'POST', body: JSON.stringify(body) }),
   };
-}
-
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  if (!origin) return true; // same-origin fetches may omit the header
-  try {
-    const url = new URL(request.url);
-    return new URL(origin).origin === url.origin;
-  } catch {
-    return false;
-  }
 }

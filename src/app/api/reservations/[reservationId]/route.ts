@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isSameOrigin } from '@/lib/http/same-origin';
 import { existingWorkspaceFor, saveWorkspace, WorkspaceError } from '@/lib/http/workspace-access';
 import { snapshotOf } from '@/lib/proof/transaction';
 import { commitReservationChange } from '@/lib/staywell/world';
@@ -59,11 +60,6 @@ export async function PATCH(
     if (cause instanceof WorkspaceError) return NextResponse.json({ error: cause.message }, { status: cause.status });
     return NextResponse.json({ error: cause instanceof Error ? cause.message : 'something went wrong' }, { status: 400 });
   }
-}
-
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  return !origin || origin === new URL(request.url).origin;
 }
 
 async function readJson(request: Request): Promise<unknown> {

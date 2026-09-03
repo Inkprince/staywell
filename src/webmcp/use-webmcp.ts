@@ -24,14 +24,16 @@ export function useWebMCP(): RegistrySnapshot {
  * Registers `descriptors` for as long as the component is mounted, and keeps the
  * registered set converged on whatever is passed.
  *
- * Re-syncs only when the *set of tool names* changes, which is what gating needs.
- * Handlers must therefore read application state at call time rather than closing
- * over a render-time snapshot — otherwise a tool would answer with stale data
- * between syncs. Every handler in `webmcp/tools` follows that rule.
+ * Re-syncs only when the *set of tool identities* changes — name plus the
+ * descriptor's `syncKey` (for task tools, the task id) — which is what gating
+ * needs. Handlers read application state at call time rather than closing over
+ * a render-time snapshot, and the registry keeps an existing registration when
+ * the identity is unchanged, so identity churn never tears the surface down.
+ * Every handler in `webmcp/tools` follows that rule.
  */
 export function useWebMCPTools(descriptors: readonly ToolDescriptor[]): void {
   const signature = useMemo(
-    () => descriptors.map((d) => d.name).sort().join('|'),
+    () => descriptors.map((d) => `${d.name}=${d.syncKey ?? ''}`).sort().join('|'),
     [descriptors],
   );
 

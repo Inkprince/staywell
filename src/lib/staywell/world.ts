@@ -20,6 +20,7 @@
  */
 
 import { intBetween, mulberry32, pick } from './rng';
+import { maxGuestsForRoom } from './catalog';
 
 export interface Room {
   id: string;
@@ -32,6 +33,7 @@ export interface Room {
 export interface Reservation {
   id: string;
   guestName: string;
+  guestCount: number;
   roomId: string;
   checkIn: string;
   nights: number;
@@ -42,6 +44,35 @@ export interface Reservation {
   /** The occupancy the price was computed at, for the inspector. */
   pricedAtOccupancy: number;
   pricedAtTick: number;
+  /** Present once the stay is paid for. A `held` booking has none. */
+  payment?: PaymentRecord;
+}
+
+/**
+ * A simulated payment. Every method here is a demo method — no real money
+ * moves, nothing is charged — but the record is part of the reservation's
+ * state, so "paid" and "not paid" are real states the interface can show.
+ */
+export interface PaymentRecord {
+  methodId: string;
+  label: string;
+  paidAt: string;
+}
+
+/** The demo payment options every guest is offered at checkout. */
+export const PAYMENT_METHODS = [
+  { id: 'visa', label: 'Visa ·· 4242', detail: 'Demo card · expires 04/29' },
+  { id: 'amex', label: 'Amex ·· 3005', detail: 'Demo card · expires 11/28' },
+  { id: 'apple-pay', label: 'Apple Pay', detail: 'Face ID, then done' },
+  { id: 'at-desk', label: 'Pay at the hotel', detail: 'Due at check-in' },
+] as const;
+
+export type PaymentMethodId = (typeof PAYMENT_METHODS)[number]['id'];
+
+export function paymentMethodById(methodId: string):
+  | { id: PaymentMethodId; label: string; detail: string }
+  | null {
+  return PAYMENT_METHODS.find((method) => method.id === methodId) ?? null;
 }
 
 export interface CompetingHold {
@@ -214,11 +245,19 @@ export function createWorld(seed: number): StayWellWorld {
   const existing = priceReservation(world, {
     id: 'res_18',
     guestName: 'Ada Lovelace',
+    guestCount: 2,
     roomId: '418',
     checkIn: '2026-09-02',
     nights: 2,
     ratePlanId: 'flex',
     status: 'confirmed',
+    // Paid when it was booked — a fixed timestamp keeps the world seed-
+    // deterministic, which the tests rely on.
+    payment: {
+      methodId: 'visa',
+      label: 'Visa ·· 4242',
+      paidAt: '2026-08-28T10:12:00.000Z',
+    },
   });
 
   return { ...world, reservations: [existing] };
@@ -252,6 +291,24 @@ export class UnavailableError extends Error {
   ) {
     super(`room ${roomId} is not available for ${dates.join(', ')}`);
     this.name = 'UnavailableError';
+  }
+}
+
+export class CapacityError extends Error {
+  constructor(
+    readonly roomId: string,
+    readonly guestCount: number,
+    readonly maximumGuests: number,
+  ) {
+    super(`room ${roomId} accommodates up to ${maximumGuests} guest${maximumGuests === 1 ? '' : 's'}`);
+    this.name = 'CapacityError';
+  }
+}
+
+export function assertGuestCapacity(roomId: string, guestCount: number): void {
+  const maximumGuests = maxGuestsForRoom(roomId);
+  if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > maximumGuests) {
+    throw new CapacityError(roomId, guestCount, maximumGuests);
   }
 }
 
@@ -376,6 +433,45 @@ export interface CommitOutcome {
 }
 
 /**
+ * Creates a new guest reservation from the same live inventory and pricing
+ * engine used by amendments. Booking is a normal human hotel action; Proof is
+ * only needed when someone wants help changing an existing stay.
+ *
+ * A fresh booking is **held, not confirmed**: it holds the room, and the stay
+ * becomes real when the guest pays (`payReservation`). Held rooms are not
+ * bookable by anyone else — the hold is honest inventory.
+ */
+export function bookReservation(
+  world: StayWellWorld,
+  request: Omit<CommitRequest, 'reservationId'> & { guestName: string; guestCount: number },
+): CommitOutcome {
+  const dates = stayDates(request.checkIn, request.nights);
+  assertGuestCapacity(request.roomId, request.guestCount);
+  assertAvailable(world, request.roomId, dates);
+  const { world: ticked, landed } = advanceTick(world);
+  const id = `res_${ticked.revision + ticked.reservations.length + 1}`;
+  const reservation = priceReservation(ticked, {
+    id,
+    guestName: request.guestName,
+    guestCount: request.guestCount,
+    roomId: request.roomId,
+    checkIn: request.checkIn,
+    nights: request.nights,
+    ratePlanId: 'flex',
+    status: 'held',
+  });
+  return {
+    world: {
+      ...ticked,
+      revision: world.revision + 1,
+      reservations: [...ticked.reservations, reservation],
+    },
+    reservation,
+    landed,
+  };
+}
+
+/**
  * Commits a change to a reservation: availability check, engine advance, and a
  * **fresh price** — computed after any demand that just landed, by the same
  * formula as the quote. This is where a $294 quote can honestly become a $319
@@ -393,6 +489,7 @@ export function commitReservationChange(
   if (!reservation) throw new Error(`unknown reservation "${request.reservationId}"`);
 
   const dates = stayDates(request.checkIn, request.nights);
+  assertGuestCapacity(request.roomId, reservation.guestCount);
   const availabilityWorld = {
     ...world,
     reservations: world.reservations.filter((r) => r.id !== request.reservationId),
@@ -405,7 +502,9 @@ export function commitReservationChange(
     roomId: request.roomId,
     checkIn: request.checkIn,
     nights: request.nights,
-    status: 'confirmed',
+    // Paid stays stay paid (and unpaid stays stay unpaid): a change of plan
+    // is not a payment event.
+    status: reservation.status,
   });
 
   const next: StayWellWorld = {
@@ -415,4 +514,55 @@ export function commitReservationChange(
   };
 
   return { world: next, reservation: priced, landed };
+}
+
+export interface PaymentOutcome {
+  world: StayWellWorld;
+  reservation: Reservation;
+}
+
+/**
+ * Pays for a held booking with one of the demo methods. Pure, like every
+ * mutating operation: a new world, the old one untouched.
+ *
+ * The revision bumps with the payment — the world genuinely moved — so a
+ * change staged against the unpaid world is honestly stale, exactly like a
+ * change staged before any other world event.
+ */
+export function payReservation(
+  world: StayWellWorld,
+  reservationId: string,
+  methodId: string,
+): PaymentOutcome {
+  const reservation = world.reservations.find((r) => r.id === reservationId);
+  if (!reservation) throw new Error(`unknown reservation "${reservationId}"`);
+
+  if (reservation.status === 'cancelled') {
+    throw new Error('a cancelled reservation cannot be paid');
+  }
+  if (reservation.status === 'confirmed') {
+    throw new Error('this reservation is already paid for');
+  }
+
+  const method = paymentMethodById(methodId);
+  if (!method) throw new Error(`unknown payment method "${methodId}"`);
+
+  const paid: Reservation = {
+    ...reservation,
+    status: 'confirmed',
+    payment: {
+      methodId: method.id,
+      label: method.label,
+      paidAt: new Date().toISOString(),
+    },
+  };
+
+  return {
+    world: {
+      ...world,
+      revision: world.revision + 1,
+      reservations: world.reservations.map((r) => (r.id === paid.id ? paid : r)),
+    },
+    reservation: paid,
+  };
 }

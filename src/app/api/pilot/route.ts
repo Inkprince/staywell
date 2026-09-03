@@ -2,7 +2,15 @@ import { NextResponse } from 'next/server';
 import type { PilotClient } from '@/lib/pilot/scripted';
 import { runScriptedPilot } from '@/lib/pilot/scripted';
 import { runOpenAiPilot } from '@/lib/pilot/openai';
-import { checkIpRate, consumeOpenAiRun, ipFromRequest, openAiBudgetRemains } from '@/lib/pilot/rate-limit';
+import { runGroqPilot } from '@/lib/pilot/groq';
+import {
+  checkIpRate,
+  consumeGroqRun,
+  consumeOpenAiRun,
+  groqBudgetRemains,
+  ipFromRequest,
+  openAiBudgetRemains,
+} from '@/lib/pilot/rate-limit';
 
 /**
  * POST /api/pilot — the server-side agent.
@@ -15,9 +23,10 @@ import { checkIpRate, consumeOpenAiRun, ipFromRequest, openAiBudgetRemains } fro
  *
  * The response is an NDJSON stream: one JSON object per line, each a step the
  * interface shows as it arrives. Engine choice is ours, not the caller's:
- * the OpenAI engine runs only when a key is configured and the daily budget
- * remains, and it degrades to the deterministic scripted pilot on provider
- * failure — so the demo never dies on a rate limit.
+ * OpenAI when its key and budget allow, then Groq (gpt-oss-20b), and the
+ * deterministic scripted pilot otherwise — and either model engine degrades
+ * to the playbook on provider failure, so the demo never dies on a rate
+ * limit.
  */
 
 export const runtime = 'nodejs';
@@ -49,15 +58,27 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  const useOpenAi = Boolean(apiKey) && openAiBudgetRemains();
-  const engine = useOpenAi ? 'openai' : 'scripted';
-  if (useOpenAi) consumeOpenAiRun();
+  const openAiKey = process.env.OPENAI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+
+  let engine: 'openai' | 'groq' | 'scripted';
+  if (openAiKey && openAiBudgetRemains()) {
+    engine = 'openai';
+    consumeOpenAiRun();
+  } else if (groqKey && groqBudgetRemains()) {
+    engine = 'groq';
+    consumeGroqRun();
+  } else {
+    engine = 'scripted';
+  }
 
   const client = forwardClient(request);
-  const run = useOpenAi
-    ? runOpenAiPilot(client, taskId, { apiKey: apiKey! })
-    : runScriptedPilot(client, taskId);
+  const run =
+    engine === 'openai'
+      ? runOpenAiPilot(client, taskId, { apiKey: openAiKey! })
+      : engine === 'groq'
+        ? runGroqPilot(client, taskId, { apiKey: groqKey! })
+        : runScriptedPilot(client, taskId);
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

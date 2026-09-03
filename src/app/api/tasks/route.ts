@@ -24,7 +24,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const workspace = existingWorkspaceFor(request);
-    const body = (await readJson(request)) as { goal?: unknown };
+    const body = (await readJson(request)) as { goal?: unknown; reservationId?: unknown };
     const goal = typeof body.goal === 'string' ? body.goal.trim() : '';
 
     if (!goal) {
@@ -34,7 +34,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'that goal is too long — keep it under 500 characters' }, { status: 400 });
     }
 
-    const { workspace: next, task } = startTask(workspace, goal);
+    const requestedReservationId = typeof body.reservationId === 'string' ? body.reservationId : '';
+    const reservationId = requestedReservationId || workspace.world.reservations[0]?.id;
+    if (!reservationId || !workspace.world.reservations.some((reservation) => reservation.id === reservationId)) {
+      return NextResponse.json({ error: 'choose one of your existing StayWell reservations' }, { status: 400 });
+    }
+
+    const { workspace: next, task } = startTask(workspace, goal, reservationId);
     saveWorkspace(next);
 
     return NextResponse.json({ task: taskView(task) }, { status: 201 });

@@ -44,12 +44,22 @@ export type ToolResult = {
   isError?: boolean;
 };
 
-/** A tool as handed to `registerTool`. */
+/**
+ * A tool as handed to `registerTool`.
+ *
+ * `syncKey` is the registry's identity for the handler's *behaviour*: two
+ * descriptors with the same name and the same `syncKey` are assumed to answer
+ * identically, so the registry keeps the existing registration instead of
+ * tearing it down and re-creating it. Handlers must read live state at call
+ * time (over HTTP, as every tool here does) for that assumption to hold.
+ */
 export interface ToolDescriptor {
   name: string;
   description: string;
   inputSchema?: JSONSchema;
   annotations?: Record<string, unknown>;
+  /** Identity of the handler's behaviour; see the interface comment. */
+  syncKey?: string;
   execute: (args: Record<string, unknown>) => unknown | Promise<unknown>;
 }
 

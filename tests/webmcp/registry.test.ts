@@ -87,6 +87,148 @@ describe('registration lifecycle', () => {
   });
 });
 
+describe('idempotence across re-renders and state changes', () => {
+  it('does not re-register a tool whose behaviour is unchanged', async () => {
+    await registry.toolRegistry.sync([tool('get_task'), tool('get_room')]);
+    // New descriptor objects every render, same behaviour: the existing
+    // registrations must be kept, not torn down and rebuilt.
+    await registry.toolRegistry.sync([tool('get_task'), tool('get_room')]);
+    await registry.toolRegistry.sync([tool('get_task'), tool('get_room')]);
+
+    expect(ctx.registerCount('get_task')).toBe(1);
+    expect(ctx.registerCount('get_room')).toBe(1);
+  });
+
+  it('re-registers only when the descriptor says its behaviour changed', async () => {
+    const v1 = { ...tool('get_task', () => ({ for: 'task_1' })), syncKey: 'task_1' };
+    await registry.toolRegistry.sync([v1]);
+    // Same shape, different syncKey: the old handler would answer for the
+    // wrong task, so the registration must be replaced.
+    const v2 = { ...tool('get_task', () => ({ for: 'task_2' })), syncKey: 'task_2' };
+    await registry.toolRegistry.sync([v2]);
+
+    expect(ctx.registerCount('get_task')).toBe(2);
+    const result = (await ctx.executeTool('get_task', {})) as {
+      structuredContent: { for: string };
+    };
+    expect(result.structuredContent.for).toBe('task_2');
+  });
+
+  it('keeps stable tools untouched while gated tools come and go', async () => {
+    // The task-screen pattern: state advances, verify_result appears, but
+    // get_task was there the whole time and must not be re-registered.
+    await registry.toolRegistry.sync([
+      { ...tool('get_task'), syncKey: 'task_1' },
+      { ...tool('stage_change'), syncKey: 'task_1' },
+    ]);
+    await registry.toolRegistry.sync([
+      { ...tool('get_task'), syncKey: 'task_1' },
+      { ...tool('verify_result'), syncKey: 'task_1' },
+    ]);
+
+    expect(ctx.names()).toEqual(['get_task', 'verify_result']);
+    expect(ctx.registerCount('get_task')).toBe(1);
+    expect(ctx.registerCount('stage_change')).toBe(1);
+    expect(ctx.wasAborted('stage_change')).toBe(true);
+  });
+});
+
+describe('slow platform removal after an abort', () => {
+  // The dev-log bug: the platform drops an aborted tool asynchronously, and
+  // `registerTool` refuses the name until it has. A registry that re-claims a
+  // name on the strength of one microtask loses that race.
+
+  it('replaces a tool without tripping over delayed removal', async () => {
+    ctx.removalDelayMs = 30;
+    const v1 = { ...tool('get_task', () => ({ answer: 'stale' })), syncKey: 'task_1' };
+    await registry.toolRegistry.sync([v1]);
+
+    const v2 = { ...tool('get_task', () => ({ answer: 'fresh' })), syncKey: 'task_2' };
+    await registry.toolRegistry.sync([v2]);
+
+    const result = (await ctx.executeTool('get_task', {})) as {
+      structuredContent: { answer: string };
+    };
+    expect(result.structuredContent.answer).toBe('fresh');
+    expect(ctx.names()).toEqual(['get_task']);
+    // Replaced exactly once — no speculative re-registrations that happened
+    // to survive, and no error swallowed along the way.
+    expect(ctx.registerCount('get_task')).toBe(2);
+  });
+
+  it('re-registers after releaseAll even while the platform is still dropping the names', async () => {
+    ctx.removalDelayMs = 30;
+    await registry.toolRegistry.sync([tool('get_task'), tool('get_room')]);
+
+    // The unmount→remount sequence: releaseAll is fire-and-forget on unmount,
+    // and the next page's sync is queued behind it while the platform lags.
+    const releasing = registry.toolRegistry.releaseAll();
+    const resyncing = registry.toolRegistry.sync([tool('get_task'), tool('get_room')]);
+    await Promise.all([releasing, resyncing]);
+
+    expect(ctx.names()).toEqual(['get_task', 'get_room']);
+    expect(ctx.registerCount('get_task')).toBe(2);
+    expect(ctx.registerCount('get_room')).toBe(2);
+  });
+
+  it('still converges when removal never completes within the wait window', async () => {
+    // Pathological platform: names stay listed forever. The registry warns,
+    // presses on, and the retry still lands the tool rather than wedging.
+    ctx.removalDelayMs = 60_000;
+    const v1 = { ...tool('get_task'), syncKey: 'task_1' };
+    await registry.toolRegistry.sync([v1]);
+
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const v2 = { ...tool('get_task', () => ({ answer: 'fresh' })), syncKey: 'task_2' };
+      const syncing = registry.toolRegistry.sync([v2]);
+      // Past the poll interval and the removal timeout, in one step.
+      await vi.advanceTimersByTimeAsync(10_000);
+      await syncing;
+      // The wait windows expired and were reported, not silently exceeded.
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+      vi.useRealTimers();
+    }
+
+    // The platform itself never dropped the name, so the old registration is
+    // what stands — but the registry settled and kept its bookkeeping
+    // consistent with the platform's.
+    expect(ctx.names()).toContain('get_task');
+  });
+});
+
+describe('concurrent syncs and releases are serialised', () => {
+  it('applies overlapping syncs in call order, not interleaved', async () => {
+    ctx.removalDelayMs = 20;
+    const first = registry.toolRegistry.sync([tool('get_task'), tool('get_room')]);
+    const second = registry.toolRegistry.sync([tool('get_room'), tool('verify_result')]);
+    await Promise.all([first, second]);
+
+    // The last sync wins, and no name was registered twice.
+    expect(ctx.names()).toEqual(['get_room', 'verify_result']);
+    expect(ctx.registerCount('get_room')).toBe(1);
+    expect(ctx.registerCount('verify_result')).toBe(1);
+    expect(ctx.wasAborted('get_task')).toBe(true);
+  });
+
+  it('a release queued after a sync cannot leave the surface empty', async () => {
+    // Route change: the old page's final sync is still queued when its
+    // unmount release lands behind it. Order must hold.
+    ctx.removalDelayMs = 20;
+    const syncing = registry.toolRegistry.sync([tool('get_task')]);
+    const releasing = registry.toolRegistry.releaseAll();
+    await Promise.all([syncing, releasing]);
+
+    expect(ctx.names()).toEqual([]);
+    expect(registry.toolRegistry.getSnapshot().registered).toEqual([]);
+  });
+});
+
 describe('call wrapping', () => {
   it('wraps plain object results in the MCP envelope', async () => {
     await registry.toolRegistry.sync([tool('get_task')]);
@@ -170,5 +312,27 @@ describe('invoke', () => {
     await expect(registry.toolRegistry.invoke('commit_change')).rejects.toThrow(
       /not available right now/i,
     );
+  });
+});
+
+describe('call provenance', () => {
+  it('labels calls the page itself made as "page"', async () => {
+    await registry.toolRegistry.sync([tool('get_task')]);
+
+    await registry.toolRegistry.invoke('get_task', {});
+
+    const [call] = registry.toolRegistry.getSnapshot().calls;
+    expect(call?.source).toBe('page');
+  });
+
+  it('labels calls dispatched by the platform as "external"', async () => {
+    await registry.toolRegistry.sync([tool('get_task')]);
+
+    // What an agent in ChatGPT's in-app browser does: the platform calls the
+    // tool, with no `invoke()` on our side.
+    await ctx.executeTool('get_task', {});
+
+    const [call] = registry.toolRegistry.getSnapshot().calls;
+    expect(call?.source).toBe('external');
   });
 });

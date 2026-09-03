@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   advanceTick,
+  bookReservation,
   CALENDAR,
   commitReservationChange,
   createWorld,
   generateSchedule,
   occupancyFor,
+  PAYMENT_METHODS,
+  payReservation,
   PRICING_TIERS,
   priceStay,
   quoteStay,
@@ -13,6 +16,7 @@ import {
   tierFor,
   TOTAL_ROOMS,
   UnavailableError,
+  CapacityError,
   type Reservation,
 } from '@/lib/staywell/world';
 
@@ -220,6 +224,165 @@ describe('commitReservationChange', () => {
     expect(() => quoteStay(world, { roomId: '9999', checkIn: FRIDAY, nights: 2 })).toThrow(
       /unknown room/,
     );
+  });
+});
+
+describe('bookReservation', () => {
+  it('creates a held booking with the same live pricing engine', () => {
+    const world = createWorld(42);
+    const shown = quoteStay(world, { roomId: '401', checkIn: FRIDAY, nights: 2 });
+    const outcome = bookReservation(world, {
+      guestName: 'Ada Lovelace',
+      guestCount: 2,
+      roomId: '401',
+      checkIn: FRIDAY,
+      nights: 2,
+    });
+
+    expect(outcome.reservation).toMatchObject({
+      guestName: 'Ada Lovelace',
+      roomId: '401',
+      checkIn: FRIDAY,
+      nights: 2,
+      // A fresh booking holds the room; it becomes a confirmed stay at
+      // checkout (payReservation below).
+      status: 'held',
+    });
+    expect(outcome.reservation.payment).toBeUndefined();
+    expect(outcome.reservation.totalDollars).toBe(shown.totalDollars);
+    expect(outcome.world.reservations).toContainEqual(outcome.reservation);
+    expect(outcome.world.tick).toBe(world.tick + 1);
+  });
+
+  it('holds the room for the guest — nobody else can book it while held', () => {
+    const world = createWorld(42);
+    const outcome = bookReservation(world, {
+      guestName: 'Ada Lovelace',
+      guestCount: 2,
+      roomId: '401',
+      checkIn: FRIDAY,
+      nights: 2,
+    });
+
+    expect(() =>
+      bookReservation(outcome.world, {
+        guestName: 'Grace Hopper',
+        guestCount: 1,
+        roomId: '401',
+        checkIn: FRIDAY,
+        nights: 2,
+      }),
+    ).toThrow(UnavailableError);
+  });
+
+  it('refuses a booking when the room cannot fit every guest', () => {
+    const world = createWorld(42);
+
+    expect(() =>
+      bookReservation(world, {
+        guestName: 'Ada Lovelace',
+        guestCount: 3,
+        roomId: '401',
+        checkIn: FRIDAY,
+        nights: 2,
+      }),
+    ).toThrow(CapacityError);
+  });
+});
+
+describe('payReservation — the demo checkout', () => {
+  it('turns a held booking into a paid, confirmed stay', () => {
+    const world = createWorld(42);
+    const booked = bookReservation(world, {
+      guestName: 'Ada Lovelace',
+      guestCount: 2,
+      roomId: '401',
+      checkIn: FRIDAY,
+      nights: 2,
+    });
+
+    const paid = payReservation(booked.world, booked.reservation.id, 'visa');
+
+    expect(paid.reservation).toMatchObject({
+      id: booked.reservation.id,
+      status: 'confirmed',
+      payment: { methodId: 'visa', label: 'Visa ·· 4242' },
+    });
+    // Pure like every mutating operation: the old world is untouched.
+    expect(booked.world.reservations.find((r) => r.id === booked.reservation.id)!.status).toBe('held');
+    // The world moved, so anything staged against the unpaid world is stale.
+    expect(paid.world.revision).toBe(booked.world.revision + 1);
+  });
+
+  it('accepts every demo method, and nothing else', () => {
+    const world = createWorld(42);
+    const booked = bookReservation(world, {
+      guestName: 'Ada Lovelace',
+      guestCount: 2,
+      roomId: '402',
+      checkIn: FRIDAY,
+      nights: 1,
+    });
+
+    for (const method of PAYMENT_METHODS) {
+      const outcome = payReservation(booked.world, booked.reservation.id, method.id);
+      expect(outcome.reservation.status).toBe('confirmed');
+      expect(outcome.reservation.payment?.methodId).toBe(method.id);
+    }
+
+    expect(() => payReservation(booked.world, booked.reservation.id, 'bitcoin')).toThrow(
+      /unknown payment method/,
+    );
+  });
+
+  it('refuses to pay twice, to pay cancelled or unknown reservations', () => {
+    const world = createWorld(42);
+    const booked = bookReservation(world, {
+      guestName: 'Ada Lovelace',
+      guestCount: 2,
+      roomId: '403',
+      checkIn: FRIDAY,
+      nights: 1,
+    });
+    const paid = payReservation(booked.world, booked.reservation.id, 'visa');
+
+    expect(() => payReservation(paid.world, paid.reservation.id, 'visa')).toThrow(
+      /already paid/,
+    );
+
+    const cancelled: Reservation = {
+      ...paid.reservation,
+      id: 'res_77',
+      status: 'cancelled',
+      payment: undefined,
+    };
+    const withCancelled = { ...paid.world, reservations: [...paid.world.reservations, cancelled] };
+    expect(() => payReservation(withCancelled, 'res_77', 'visa')).toThrow(/cancelled/);
+
+    expect(() => payReservation(paid.world, 'res_999', 'visa')).toThrow(/unknown reservation/);
+  });
+
+  it('keeps an unpaid stay unpaid through a change of plan', () => {
+    // A change is not a payment event: Proof moving a held reservation must
+    // not quietly confirm it.
+    const world = createWorld(42);
+    const booked = bookReservation(world, {
+      guestName: 'Ada Lovelace',
+      guestCount: 2,
+      roomId: '404',
+      checkIn: FRIDAY,
+      nights: 1,
+    });
+
+    const moved = commitReservationChange(booked.world, {
+      reservationId: booked.reservation.id,
+      roomId: '404',
+      checkIn: '2026-09-05',
+      nights: 1,
+    });
+
+    expect(moved.reservation.status).toBe('held');
+    expect(moved.reservation.payment).toBeUndefined();
   });
 });
 

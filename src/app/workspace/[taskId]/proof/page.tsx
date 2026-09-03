@@ -14,6 +14,7 @@ import Link from 'next/link';
 import type { PublicTask } from '@/lib/http/task-view';
 import type { ReservationSnapshot } from '@/lib/proof/constraints';
 import { dayLabel, fullTimestamp, shortConstraint } from '@/features/workspace/humanize';
+import { StayWellNav } from '@/features/staywell/staywell-nav';
 
 export default function ProofReceiptPage({
   params,
@@ -54,11 +55,13 @@ export default function ProofReceiptPage({
 
   if (!task) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-20">
-        <p className="text-ink-muted">{error ?? 'Loading…'}</p>
-        <Link href="/workspace" className="mt-4 inline-block text-cobalt hover:underline">
-          Back to your workspace
-        </Link>
+      <main className="min-h-dvh bg-canvas"><StayWellNav />
+        <div className="mx-auto max-w-2xl px-6 pt-36 pb-24">
+          <p className="text-ink-muted">{error ?? 'Loading…'}</p>
+          <Link href="/workspace" className="mt-4 inline-block text-cobalt hover:underline">
+            Back to your workspace
+          </Link>
+        </div>
       </main>
     );
   }
@@ -68,26 +71,28 @@ export default function ProofReceiptPage({
   const matched = verification?.matched ?? false;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-16">
-      <Link
-        href={`/workspace/${taskId}`}
-        className="text-sm text-ink-subtle transition-colors hover:text-ink"
-      >
-        ← Back to the task
-      </Link>
+    <main className="min-h-dvh bg-canvas"><StayWellNav />
+      <div className="mx-auto max-w-2xl px-6 pt-32 pb-24 lg:pt-36">
+        <Link
+          href={`/workspace/${taskId}`}
+          className="text-sm text-ink-subtle transition-colors hover:text-ink"
+        >
+          ← Back to the task
+        </Link>
 
-      <h1 className="mt-8 font-display text-4xl text-ink">Proof of completion</h1>
+        <p className="mt-8 text-xs font-medium tracking-[0.22em] text-cobalt uppercase">The receipt</p>
+        <h1 className="mt-4 font-display text-4xl leading-tight tracking-tight text-ink md:text-5xl">What actually happened</h1>
 
       <section className="mt-10 space-y-8">
         <div>
-          <h2 className="text-sm font-medium tracking-wide text-ink-subtle uppercase">
+          <h2 className="text-xs font-medium tracking-[0.18em] text-ink-subtle uppercase">
             Your request
           </h2>
           <p className="mt-2 text-lg text-ink">“{task.goal}”</p>
         </div>
 
         <div>
-          <h2 className="text-sm font-medium tracking-wide text-ink-subtle uppercase">
+          <h2 className="text-xs font-medium tracking-[0.18em] text-ink-subtle uppercase">
             Final result
           </h2>
           <p className="mt-2 text-lg text-ink">
@@ -98,21 +103,21 @@ export default function ProofReceiptPage({
         </div>
 
         <div>
-          <h2 className="text-sm font-medium tracking-wide text-ink-subtle uppercase">Checked</h2>
+          <h2 className="text-xs font-medium tracking-[0.18em] text-ink-subtle uppercase">Checked</h2>
           <p className="mt-2 text-ink-muted">
             {verification ? fullTimestamp(verification.checkedAt) : 'Not yet checked'}
           </p>
         </div>
 
         <div
-          className={`rounded-xl border p-6 ${
+          className={`rounded-[2rem] border p-6 ${
             matched
               ? 'border-verified-line bg-verified-soft'
               : 'border-caution-line bg-caution-soft'
           }`}
           role="status"
         >
-          <p className={`font-display text-2xl ${matched ? 'text-verified' : 'text-caution'}`}>
+          <p className={`font-display text-2xl tracking-tight ${matched ? 'text-verified' : 'text-caution'}`}>
             {matched
               ? '✓ Everything matched'
               : task.state === 'ACCEPTED_WITH_EXCEPTIONS'
@@ -179,6 +184,7 @@ export default function ProofReceiptPage({
           </div>
         ) : null}
       </section>
+      </div>
     </main>
   );
 }

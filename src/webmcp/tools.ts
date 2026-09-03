@@ -34,6 +34,7 @@ import {
 /** What the tools layer needs to know about the page's task. */
 export interface TaskContext {
   taskId: string | null;
+  reservationId?: string | null;
   state: string;
 }
 
@@ -112,8 +113,11 @@ const getReservation: Builder = (context) =>
     ? {
         ...GET_RESERVATION,
         execute: (args) => {
-          const reservationId = typeof args.reservationId === 'string' ? args.reservationId : '';
+          const reservationId = typeof args.reservationId === 'string' ? args.reservationId : context.reservationId ?? '';
           if (!reservationId) return { error: 'reservationId is required, like "res_18"' };
+          if (context.reservationId && reservationId !== context.reservationId) {
+            return { error: `this Proof task is limited to reservation "${context.reservationId}"` };
+          }
           return api(`/api/reservations/${encodeURIComponent(reservationId)}`);
         },
       }
@@ -279,11 +283,19 @@ const BUILDERS: readonly Builder[] = [
  * Derives the full tool set for a task context. Lifecycle-gated: tools appear
  * and disappear as the task advances, and the platform's toolchange event
  * fires for each change as `useWebMCPTools` re-syncs.
+ *
+ * Every descriptor carries the task id as its `syncKey`: handlers close over
+ * the context only to default `taskId` and read everything else from the
+ * server at call time, so the task id is the whole of a handler's behavioural
+ * identity. State changes therefore add and remove gated tools without
+ * re-registering the ones that stay — and the registry never reclaims a name
+ * it did not need to release.
  */
 export function toolsForTask(context: TaskContext): ToolDescriptor[] {
-  return BUILDERS.map((build) => build(context)).filter(
-    (tool): tool is ToolDescriptor => tool !== null,
-  );
+  const syncKey = context.taskId ?? '';
+  return BUILDERS.map((build) => build(context))
+    .filter((tool): tool is ToolDescriptor => tool !== null)
+    .map((tool) => ({ ...tool, syncKey }));
 }
 
 /** The names a given state exposes — used by tests and the inspector. */

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { PublicTask } from '@/lib/http/task-view';
 import { STATE_LABELS } from '@/features/workspace/humanize';
+import { StayWellNav } from '@/features/staywell/staywell-nav';
 
 const EXAMPLES = [
   'Move my reservation to Friday without spending more than $300.',
@@ -86,95 +87,93 @@ export default function WorkspacePage() {
   );
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-20">
-      <Link
-        href="/"
-        className="text-sm text-ink-subtle transition-colors hover:text-ink"
-      >
-        Proof
-      </Link>
+    <main className="min-h-dvh bg-canvas">
+      <div className="mx-auto max-w-3xl px-6 pt-32 pb-24 md:pt-40">
+        <StayWellNav />
+        <p className="text-xs font-medium tracking-[0.22em] text-cobalt uppercase">Proof workspace</p>
 
-      <h1 className="mt-10 font-display text-5xl leading-tight tracking-tight text-ink">
-        {greeting}
-      </h1>
-      <p className="mt-3 text-xl text-ink-muted">What would you like to get done?</p>
+        <h1 className="mt-5 font-display text-5xl leading-[1.02] tracking-tight text-ink md:text-6xl">
+          {greeting}
+        </h1>
+        <p className="mt-4 text-xl text-ink-muted">What would you like to get done?</p>
 
-      <form
-        className="mt-10"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void startTask(goal);
-        }}
-      >
-        <label htmlFor="goal" className="sr-only">
-          Tell Proof what you want to accomplish
-        </label>
-        <textarea
-          id="goal"
-          value={goal}
-          onChange={(event) => setGoal(event.target.value)}
-          rows={3}
-          placeholder="Tell Proof what you want to accomplish…"
-          className="w-full rounded-xl border border-line bg-surface px-5 py-4 text-lg text-ink shadow-sm placeholder:text-ink-subtle focus:border-cobalt focus:outline-none"
-        />
-        <div className="mt-4 flex items-center gap-4">
-          <button
-            type="submit"
-            disabled={busy || !goal.trim()}
-            className="rounded-md bg-cobalt px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-cobalt-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy ? 'Starting…' : 'Start'}
-          </button>
-          {error ? (
-            <p role="alert" className="text-sm text-mismatch">
-              {error}
-            </p>
-          ) : null}
-        </div>
-      </form>
+        <form
+          className="mt-10"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void startTask(goal);
+          }}
+        >
+          <label htmlFor="goal" className="sr-only">
+            Tell Proof what you want to accomplish
+          </label>
+          <textarea
+            id="goal"
+            value={goal}
+            onChange={(event) => setGoal(event.target.value)}
+            rows={3}
+            placeholder="Tell Proof what you want to accomplish…"
+            className="w-full rounded-[2rem] border border-line bg-surface px-6 py-5 text-lg text-ink shadow-[0_20px_50px_-20px_rgba(25,26,28,0.15)] placeholder:text-ink-subtle focus:border-cobalt focus:outline-none"
+          />
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <button
+              type="submit"
+              disabled={busy || !goal.trim()}
+              className="rounded-full bg-ink px-8 py-3.5 text-sm font-medium text-white transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? 'Starting…' : 'Start'}
+            </button>
+            {error ? (
+              <p role="alert" className="text-sm text-mismatch">
+                {error}
+              </p>
+            ) : null}
+          </div>
+        </form>
 
-      <section aria-label="Examples" className="mt-8">
-        <p className="text-sm text-ink-subtle">For example:</p>
-        <ul className="mt-3 space-y-2">
-          {EXAMPLES.map((example) => (
-            <li key={example}>
-              <button
-                type="button"
-                onClick={() => setGoal(example)}
-                className="text-left text-ink-muted underline decoration-line-strong underline-offset-4 transition-colors hover:text-ink"
-              >
-                “{example}”
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {tasks.length > 0 ? (
-        <section aria-labelledby="tasks-heading" className="mt-16 border-t border-line pt-8">
-          <h2
-            id="tasks-heading"
-            className="text-sm font-medium tracking-wide text-ink-subtle uppercase"
-          >
-            Your tasks
-          </h2>
-          <ul className="mt-4 divide-y divide-line">
-            {tasks.map((task) => (
-              <li key={task.id}>
-                <Link
-                  href={`/workspace/${task.id}`}
-                  className="group -mx-2 flex items-baseline justify-between gap-4 rounded-md px-2 py-3 transition-colors hover:bg-sunken"
+        <section aria-label="Examples" className="mt-8">
+          <p className="text-xs font-medium tracking-[0.18em] text-ink-subtle uppercase">For example</p>
+          <ul className="mt-4 space-y-2.5">
+            {EXAMPLES.map((example) => (
+              <li key={example}>
+                <button
+                  type="button"
+                  onClick={() => setGoal(example)}
+                  className="text-left text-ink-muted underline decoration-line-strong decoration-1 underline-offset-4 transition-colors hover:text-ink"
                 >
-                  <span className="text-ink group-hover:text-cobalt">{task.goal}</span>
-                  <span className="shrink-0 text-sm text-ink-subtle">
-                    {STATE_LABELS[task.state]}
-                  </span>
-                </Link>
+                  “{example}”
+                </button>
               </li>
             ))}
           </ul>
         </section>
-      ) : null}
+
+        {tasks.length > 0 ? (
+          <section aria-labelledby="tasks-heading" className="mt-16 border-t border-line pt-8">
+            <h2
+              id="tasks-heading"
+              className="text-xs font-medium tracking-[0.18em] text-ink-subtle uppercase"
+            >
+              Your tasks
+            </h2>
+            <ul className="mt-4 divide-y divide-line">
+              {tasks.map((task) => (
+                <li key={task.id}>
+                  <Link
+                    href={`/workspace/${task.id}`}
+                    className="group -mx-3 flex items-baseline justify-between gap-4 rounded-2xl px-3 py-3.5 transition-colors hover:bg-sunken"
+                  >
+                    <span className="text-ink group-hover:text-cobalt">{task.goal}</span>
+                    <span className="shrink-0 text-sm text-ink-subtle">
+                      {STATE_LABELS[task.state]}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </div>
     </main>
   );
 }

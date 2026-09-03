@@ -278,9 +278,7 @@ export async function GET(
     const task = workspace.tasks.find((t) => t.id === taskId);
     if (!task) return NextResponse.json({ error: `no task "${taskId}"` }, { status: 404 });
 
-    const reservation = workspace.world.reservations.find(
-      (r) => r.id === task.staged?.request.reservationId,
-    );
+    const reservation = workspace.world.reservations.find((r) => r.id === task.reservationId);
     return NextResponse.json({
       task: taskView(task),
       reservation: reservation ? snapshotOf(reservation) : null,

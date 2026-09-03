@@ -24,10 +24,7 @@ export async function GET(
 
     // The reservation this task is about — the one it staged a change against,
     // if any. A task with nothing staged yet concerns the guest's booking.
-    const reservationId = task.staged?.request.reservationId;
-    const reservation = reservationId
-      ? (workspace.world.reservations.find((r) => r.id === reservationId) ?? null)
-      : (workspace.world.reservations[0] ?? null);
+    const reservation = workspace.world.reservations.find((r) => r.id === task.reservationId) ?? null;
 
     return NextResponse.json({
       task: taskView(task),

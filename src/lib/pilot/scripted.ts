@@ -28,7 +28,7 @@ export interface PilotStep {
 }
 
 export interface PilotRun {
-  engine: 'scripted' | 'openai';
+  engine: 'scripted' | 'openai' | 'groq';
   steps: PilotStep[];
   /** Where the task ended up, as the pilot last saw it. */
   finalState?: string;
@@ -230,6 +230,7 @@ export async function* runScriptedPilot(
       checkIn: string;
       roomId: string;
       nights: number;
+      guestCount?: number;
     } | null;
     error?: string;
   };
@@ -273,7 +274,7 @@ async function* planAndStage(
   client: PilotClient,
   taskId: string,
   task: { state: string; revision: number; goal: string },
-  reservation: { reservationId: string; checkIn: string; roomId: string; nights: number },
+  reservation: { reservationId: string; checkIn: string; roomId: string; nights: number; guestCount?: number },
 ): Run {
   const parsed = parseGoal(task.goal, reservation);
 
@@ -321,6 +322,7 @@ async function* planAndStage(
     const availability = (await client.post('/api/availability', {
       checkIn: request.checkIn,
       nights: request.nights,
+      guests: reservation.guestCount ?? 1,
     })) as {
       rooms?: {
         roomId: string;

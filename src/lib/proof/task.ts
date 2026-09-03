@@ -61,6 +61,8 @@ export interface VerificationRecord {
 export interface ProofTask {
   id: string;
   workspaceId: string;
+  /** The StayWell reservation this task may inspect and change. Immutable after creation. */
+  reservationId: string;
   /** The human's words, verbatim. */
   goal: string;
   state: TaskState;

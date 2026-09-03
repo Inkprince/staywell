@@ -12,6 +12,7 @@ import type { ProofTask } from '@/lib/proof/task';
 export function taskView(task: ProofTask) {
   return {
     id: task.id,
+    reservationId: task.reservationId,
     goal: task.goal,
     state: task.state,
     revision: task.revision,

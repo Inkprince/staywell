@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { existingWorkspaceFor, WorkspaceError } from '@/lib/http/workspace-access';
 import { quoteStay, ROOMS, stayDates, UnavailableError } from '@/lib/staywell/world';
+import { collectionForRoom } from '@/lib/staywell/catalog';
 
 /**
  * POST /api/availability — every room, quoted fresh for a stay.
@@ -12,11 +13,12 @@ import { quoteStay, ROOMS, stayDates, UnavailableError } from '@/lib/staywell/wo
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const workspace = existingWorkspaceFor(request);
-    const body = (await readJson(request)) as { checkIn?: unknown; nights?: unknown };
+    const body = (await readJson(request)) as { checkIn?: unknown; nights?: unknown; guests?: unknown };
 
     const checkIn = typeof body.checkIn === 'string' ? body.checkIn : '';
     const nights = Number(body.nights);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkIn) || !Number.isInteger(nights) || nights < 1 || nights > 7) {
+    const guests = Number(body.guests ?? 1);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkIn) || !Number.isInteger(nights) || nights < 1 || nights > 7 || !Number.isInteger(guests) || guests < 1 || guests > 4) {
       return NextResponse.json(
         { error: 'checkIn (YYYY-MM-DD) and nights (1–7) are required' },
         { status: 400 },
@@ -34,13 +36,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const rooms = ROOMS.map((room) => {
-      let available = true;
+      const collection = collectionForRoom(room.id);
+      let available = guests <= collection.maxGuests;
       let reason: string | null = null;
+      if (!available) reason = `sleeps up to ${collection.maxGuests} guests`;
       try {
-        for (const reservation of workspace.world.reservations) {
-          if (reservation.status === 'cancelled' || reservation.roomId !== room.id) continue;
-          if (dates.some((d) => stayDates(reservation.checkIn, reservation.nights).includes(d))) {
-            throw new UnavailableError(room.id, dates);
+        if (available) {
+          for (const reservation of workspace.world.reservations) {
+            if (reservation.status === 'cancelled' || reservation.roomId !== room.id) continue;
+            if (dates.some((d) => stayDates(reservation.checkIn, reservation.nights).includes(d))) {
+              throw new UnavailableError(room.id, dates);
+            }
           }
         }
       } catch {
@@ -57,6 +63,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return {
         roomId: room.id,
         category: room.category,
+        collection,
         available,
         reason,
         quote: {
@@ -67,7 +74,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       };
     });
 
-    return NextResponse.json({ checkIn, nights, rooms });
+    return NextResponse.json({ checkIn, nights, guests, rooms });
   } catch (cause) {
     if (cause instanceof WorkspaceError) {
       return NextResponse.json({ error: cause.message }, { status: cause.status });

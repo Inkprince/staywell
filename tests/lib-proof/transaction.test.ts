@@ -271,6 +271,22 @@ describe('adversarial moves are refused', () => {
 });
 
 describe('quotes', () => {
+  it('binds a task to the reservation it was started for', () => {
+    let ws = workspaceFor(42);
+    const first = startTask(ws, 'Help with my original stay', 'res_18');
+    ws = first.workspace;
+    const secondReservation = {
+      ...ws.world.reservations[0]!,
+      id: 'res_19',
+      roomId: '401',
+    };
+    ws = { ...ws, world: { ...ws.world, reservations: [...ws.world.reservations, secondReservation] } };
+
+    expect(() =>
+      getQuote(ws, first.task.id, { ...MOVE_REQUEST, reservationId: 'res_19' }),
+    ).toThrow(/limited to reservation|for reservation/);
+  });
+
   it('are read-only: the engine does not advance', () => {
     let ws = workspaceFor(42);
     const start = startTask(ws, 'Move my reservation to Friday');

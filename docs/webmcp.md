@@ -11,7 +11,7 @@ WebMCP is a browser API: a page exposes structured tools through `document.model
 | Mode | Meaning |
 | --- | --- |
 | `native` | `document.modelContext` (or the pre-standard `navigator.modelContext`) exists — the platform itself owns the surface. |
-| `polyfill` | No native support, so the vendored Apache-2.0 polyfill (from GoogleChromeLabs/webmcp-tools, served at `/webmcp-polyfill.js`, see `polyfill/NOTICE`) provides `registerTool` / `executeTool` in-page. |
+| `polyfill` | No native support, so the vendored Apache-2.0 polyfill (from GoogleChromeLabs/webmcp-tools, served at `/webmcp-polyfill.js`, see `src/webmcp/polyfill/NOTICE`) provides `registerTool` / `executeTool` in-page. |
 | `unavailable` | Neither worked. The product still functions; only the agent surface is absent, and the UI says so plainly. |
 
 ## The tool set
@@ -31,7 +31,20 @@ Thirteen tools (`webmcp/schemas.ts`), each with a typed JSON schema, each execut
 - `verify_result` is genuinely **absent** until a change has been committed — an agent cannot even discover it early, let alone call it.
 - `find_recovery_options` exists only after a caught mismatch.
 
-A descriptor is also re-registered whenever it changes, because handlers close over task state and a stale closure would answer with stale data.
+## Lifecycle: registration is idempotent and serialised
+
+Two platform facts drive the registry's design:
+
+1. **`registerTool` refuses a name that is still registered**, and the platform's abort-driven removal is *asynchronous*. Aborting a tool's signal and immediately re-registering the same name is a race the page loses — it surfaces as `InvalidStateError: Tool "get_task" is already registered`.
+2. Route changes, re-renders, and StrictMode double-mounts produce bursts of `sync()`/`releaseAll()` calls that must not interleave.
+
+So the registry:
+
+- **Skips re-registration when nothing changed.** Each descriptor carries a `syncKey` (for task tools, the task id) that identifies its handler's behaviour — handlers read live state over HTTP at call time, so the task id is the whole of that identity. A state change therefore adds and removes gated tools without touching the ones that stay.
+- **Waits for removal before reclaiming a name** it genuinely had to release: after an abort, it polls `getTools()` until the platform stops listing the name, and `registerTool`'s "already registered" refusal triggers exactly one retry after such a wait.
+- **Serialises every mutation** through a single queue, so a route change's `releaseAll()` and the next page's `sync()` apply in order rather than racing.
+
+The regression tests in `tests/webmcp/registry.test.ts` pin all of this — including a platform whose removal lags behind the abort (`removalDelayMs` on the fake), which is how the original duplicate-registration bug is kept from coming back.
 
 ## What is deliberately withheld
 
@@ -46,9 +59,9 @@ This absence is structural, not conventional: `tests/boundaries.test.ts` fails t
 
 ## Observation
 
-Every call is wrapped (`registry.ts`) so results leave as the same MCP-style envelope — a text block carrying a compact JSON rendering for language models, plus `structuredContent` for richer clients — and every call lands in an in-page log the inspector renders: what the agent asked, what the page answered, and how long it took. Failures return as readable error envelopes rather than rejected promises, because an agent can act on a message.
+Every call is wrapped (`registry.ts`) so results leave as the same MCP-style envelope — a text block carrying a compact JSON rendering for language models, plus `structuredContent` for richer clients — and every call lands in an in-page log the inspector renders: what the agent asked, what the page answered, how long it took, and **who caused it**. Calls the platform dispatched (a real WebMCP call from an agent in ChatGPT's in-app browser) are labelled `external`; calls this page invoked itself (a self-test, an in-page demo) are labelled `page`. The built-in fallback pilot runs server-side over HTTP and never appears in this log at all — so nothing in it can be mistaken for, or passed off as, an external agent's work. Failures return as readable error envelopes rather than rejected promises, because an agent can act on a message.
 
-The inspector itself is public at **`/agent-check`** — no secrets, just the current mode, the registered tool set, the withheld list, and the call log. It is the fastest way to see the surface working in any browser.
+The preflight page is public at **`/agent-check`** — no secrets, just an unambiguous pass/fail check on the native tool surface (native / fallback / no connection, read back from the platform), a concise "how to test in ChatGPT" flow, the registered tool set, the withheld list, and the provenance-labelled call log. It is the fastest way for a judge to confirm the surface is real in any browser.
 
 ## The pilot is a client of this contract
 

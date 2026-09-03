@@ -47,9 +47,10 @@
   --color-mismatch-soft: #fbeae6;
   --color-mismatch-line: #eec4b9;
 
-  /* Type */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display), Georgia, serif;
+  /* Type. DM Sans is the body voice — the closest open match to Google Sans,
+   * which is proprietary. Plus Jakarta Sans carries display sizes. */
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), var(--font-body), ui-sans-serif, system-ui, sans-serif;
 
   /* Motion — every transition respects prefers-reduced-motion below. */
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);

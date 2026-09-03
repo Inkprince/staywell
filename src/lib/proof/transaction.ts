@@ -23,6 +23,7 @@ import { verify, type VerificationResult } from './verifier';
 import type { Workspace } from '@/lib/store/memory';
 import {
   advanceTick,
+  assertGuestCapacity,
   commitReservationChange,
   quoteStay,
   type CompetingHold,
@@ -41,6 +42,7 @@ export function snapshotOf(reservation: Reservation): ReservationSnapshot {
     roomId: reservation.roomId,
     totalPrice: reservation.totalDollars,
     guestName: reservation.guestName,
+    guestCount: reservation.guestCount,
     ratePlanId: reservation.ratePlanId,
     nights: reservation.nights,
     status: reservation.status,
@@ -87,13 +89,19 @@ export interface StartTaskResult {
   task: ProofTask;
 }
 
-export function startTask(workspace: Workspace, goal: string): StartTaskResult {
+export function startTask(
+  workspace: Workspace,
+  goal: string,
+  reservationId: string = workspace.world.reservations[0]?.id ?? '',
+): StartTaskResult {
+  findReservation(workspace.world, reservationId);
   const id = `task_${workspace.taskCounter + 1}`;
   const at = nowIso();
 
   const task: ProofTask = {
     id,
     workspaceId: workspace.id,
+    reservationId,
     goal,
     state: 'NEW',
     constraints: [],
@@ -168,8 +176,10 @@ export function getQuote(
   taskId: string,
   stay: { reservationId: string; roomId: string; checkIn: string; nights: number },
 ): { quote: Quote; reservation: ReservationSnapshot } {
-  findTask(workspace, taskId);
+  const task = findTask(workspace, taskId);
+  assertTaskReservation(task, stay.reservationId);
   const reservation = findReservation(workspace.world, stay.reservationId);
+  assertGuestCapacity(stay.roomId, reservation.guestCount);
   return {
     quote: quoteStay(workspace.world, stay),
     reservation: snapshotOf(reservation),
@@ -184,8 +194,11 @@ export function stageChange(
 ): { workspace: Workspace; task: ProofTask; change: StagedChange } {
   const task = findTask(workspace, taskId);
   assertCurrentRevision(options.baseRevision, workspace.world.revision);
+  assertTaskReservation(task, request.reservationId);
 
-  const before = snapshotOf(findReservation(workspace.world, request.reservationId));
+  const reservation = findReservation(workspace.world, request.reservationId);
+  const before = snapshotOf(reservation);
+  assertGuestCapacity(request.roomId, reservation.guestCount);
   const quote = quoteStay(workspace.world, request);
 
   // Staging is a mutation: the engine advances, competing demand may land —
@@ -219,6 +232,12 @@ export function stageChange(
   };
 
   return { workspace: next, task: next.tasks.find((t) => t.id === taskId)!, change };
+}
+
+function assertTaskReservation(task: ProofTask, reservationId: string): void {
+  if (task.reservationId !== reservationId) {
+    throw new Error(`this Proof task is for reservation "${task.reservationId}", not "${reservationId}"`);
+  }
 }
 
 // ---------------------------------------------------------------------------

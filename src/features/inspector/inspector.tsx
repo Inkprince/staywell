@@ -57,20 +57,20 @@ export function Inspector({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-line px-3 py-1.5 text-sm text-ink transition-colors hover:bg-sunken"
+            className="rounded-full border border-line px-4 py-2 text-sm text-ink transition-colors hover:bg-sunken"
           >
             Close
           </button>
         </header>
 
-        <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2" aria-label="Inspector sections">
+        <nav className="flex gap-1.5 overflow-x-auto border-b border-line px-4 py-2.5" aria-label="Inspector sections">
           {TABS.map((name) => (
             <button
               key={name}
               type="button"
               onClick={() => setTab(name)}
               aria-current={tab === name}
-              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
+              className={`rounded-full px-3.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
                 tab === name ? 'bg-sunken font-medium text-ink' : 'text-ink-muted hover:text-ink'
               }`}
             >
@@ -90,7 +90,7 @@ export function Inspector({
               {registered.length > 0 ? (
                 <ul className="space-y-1 font-mono text-sm text-ink">
                   {registered.map((name) => (
-                    <li key={name} className="rounded bg-sunken px-2 py-1">
+                    <li key={name} className="rounded-lg bg-sunken px-2.5 py-1.5">
                       {name}
                     </li>
                   ))}
@@ -115,8 +115,13 @@ export function Inspector({
           {tab === 'Actions' ? (
             <section>
               <p className="mb-3 text-sm text-ink-muted">
-                Every tool call made on this page, with what was asked and what came back —
-                the log the platform sees.
+                Every tool call made on this page, with what was asked and what came
+                back — the log the platform sees. Each entry is labelled by who
+                caused it: <SourceBadge source="external" /> is a real WebMCP call,
+                dispatched by the platform (an agent in ChatGPT's in-app browser);
+                <SourceBadge source="page" /> was invoked by this page itself. The
+                built-in fallback pilot runs server-side over HTTP and never
+                appears here.
               </p>
               {calls.length === 0 ? (
                 <p className="font-mono text-sm text-ink-subtle">
@@ -125,7 +130,7 @@ export function Inspector({
               ) : (
                 <ul className="space-y-3">
                   {calls.map((call) => (
-                    <li key={call.id} className="rounded-lg border border-line p-3">
+                    <li key={call.id} className="rounded-2xl border border-line p-4">
                       <p className="font-mono text-sm text-ink">
                         {call.tool}
                         <span
@@ -133,6 +138,9 @@ export function Inspector({
                         >
                           {call.outcome} · {call.durationMs}ms
                         </span>
+                      </p>
+                      <p className="mt-1.5">
+                        <SourceBadge source={call.source} />
                       </p>
                       <p className="mt-1 text-xs text-ink-subtle">{call.startedAt}</p>
                       <Json value={call.args} label="arguments" />
@@ -170,7 +178,7 @@ export function Inspector({
               </p>
               <ul className="space-y-2">
                 {events.map((event, index) => (
-                  <li key={index} className="rounded-lg border border-line p-3">
+                  <li key={index} className="rounded-2xl border border-line p-3.5">
                     <p className="font-mono text-sm text-ink">{event.type}</p>
                     <p className="text-xs text-ink-subtle">{event.at}</p>
                   </li>
@@ -191,9 +199,26 @@ function Json({ value, label }: { value: unknown; label?: string }) {
   return (
     <div className="mt-2">
       {label ? <p className="text-xs text-ink-subtle uppercase">{label}</p> : null}
-      <pre className="mt-1 max-h-72 overflow-auto rounded-md bg-sunken p-3 font-mono text-xs leading-relaxed text-ink">
+      <pre className="mt-1 max-h-72 overflow-auto rounded-xl bg-sunken p-3 font-mono text-xs leading-relaxed text-ink">
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>
+  );
+}
+
+function SourceBadge({ source }: { source: 'external' | 'page' }) {
+  return (
+    <span
+      className={`rounded-full px-2.5 py-0.5 font-mono text-xs ${
+        source === 'external' ? 'bg-verified-soft text-ink' : 'bg-sunken text-ink-subtle'
+      }`}
+    >
+      {source === 'external' ? 'external · WebMCP' : 'this page'}
+      <span className="sr-only">
+        {source === 'external'
+          ? ' (dispatched by the platform, a real WebMCP call)'
+          : ' (invoked by this page)'}
+      </span>
+    </span>
   );
 }

@@ -16,12 +16,15 @@ export interface ReservationSnapshot {
   /** Total price for the stay, in whole currency units. */
   totalPrice: number;
   guestName: string;
+  /** Occupancy is shown to the guest and enforced by the hotel engine. */
+  guestCount?: number;
   ratePlanId: string;
   nights: number;
   status: 'held' | 'confirmed' | 'cancelled';
 }
 
-export type ConstraintField = keyof ReservationSnapshot;
+/** Guest count is operational context, not a field a Proof task may alter. */
+export type ConstraintField = Exclude<keyof ReservationSnapshot, 'guestCount'>;
 
 export type Constraint =
   | { kind: 'date_equals'; date: string }

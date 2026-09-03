@@ -14,7 +14,7 @@ import { NextResponse } from 'next/server';
 const WORKSPACE_COOKIE = 'proof_w';
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
-function newWorkspaceId(): string {
+export function newWorkspaceId(): string {
   return `ws_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
 }
 

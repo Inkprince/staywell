@@ -32,6 +32,7 @@ import {
   timeLabel,
 } from '@/features/workspace/humanize';
 import { Inspector } from '@/features/inspector/inspector';
+import { StayWellNav } from '@/features/staywell/staywell-nav';
 
 export default function TaskPage({
   params,
@@ -51,8 +52,8 @@ export default function TaskPage({
 
   // The agent surface, derived from the live task state.
   const tools = useMemo(
-    () => toolsForTask({ taskId, state: task?.state ?? 'NEW' }),
-    [taskId, task?.state],
+    () => toolsForTask({ taskId, reservationId: task?.reservationId ?? null, state: task?.state ?? 'NEW' }),
+    [taskId, task?.reservationId, task?.state],
   );
   useWebMCPTools(tools);
 
@@ -65,11 +66,13 @@ export default function TaskPage({
 
   if (!task) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-20">
-        <p className="text-ink-muted">{error ?? 'Loading…'}</p>
-        <Link href="/workspace" className="mt-4 inline-block text-cobalt hover:underline">
-          Back to your workspace
-        </Link>
+      <main className="min-h-dvh bg-canvas"><StayWellNav />
+        <div className="mx-auto max-w-3xl px-6 pt-36 pb-24">
+          <p className="text-ink-muted">{error ?? 'Loading…'}</p>
+          <Link href="/reservations" className="mt-4 inline-block text-cobalt hover:underline">
+            Back to your StayWell reservations
+          </Link>
+        </div>
       </main>
     );
   }
@@ -77,17 +80,19 @@ export default function TaskPage({
   const staged = task.staged;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12 pb-24">
+    <main className="min-h-dvh bg-canvas"><StayWellNav />
+      <div className="mx-auto max-w-3xl px-6 pt-32 pb-24 lg:pt-36">
       <div className="flex items-baseline justify-between">
-        <Link href="/workspace" className="text-sm text-ink-subtle transition-colors hover:text-ink">
-          ← Your workspace
+        <Link href={`/reservations/${task.reservationId}`} className="text-sm text-ink-subtle transition-colors hover:text-ink">
+          ← Back to reservation {task.reservationId.replace('res_', '#')}
         </Link>
         <p aria-live="polite" className="text-sm text-ink-subtle">
           {STATE_LABELS[task.state]}
         </p>
       </div>
 
-      <h1 className="mt-6 font-display text-3xl leading-snug tracking-tight text-ink">
+      <p className="mt-8 text-xs font-medium tracking-[0.18em] text-cobalt uppercase">You asked Proof</p>
+      <h1 className="mt-4 font-display text-3xl leading-snug tracking-tight text-ink md:text-4xl">
         {task.goal}
       </h1>
 
@@ -107,7 +112,7 @@ export default function TaskPage({
 
       <div aria-live="polite">
         {error ? (
-          <p role="alert" className="mt-6 rounded-lg bg-mismatch-soft px-4 py-3 text-sm text-mismatch">
+          <p role="alert" className="mt-6 rounded-2xl bg-mismatch-soft px-5 py-4 text-sm text-mismatch">
             {error}
           </p>
         ) : null}
@@ -126,7 +131,7 @@ export default function TaskPage({
         ) : null}
 
         {['APPROVED', 'EXECUTING', 'VERIFYING'].includes(task.state) ? (
-          <section className="mt-10 rounded-xl border border-line bg-surface p-8 text-center">
+          <section className="mt-10 rounded-[2rem] border border-line bg-surface p-8 text-center shadow-[0_20px_50px_-20px_rgba(25,26,28,0.12)]">
             <p className="text-ink-muted">
               {task.state === 'VERIFYING' ? 'Checking the result…' : 'Making the change…'}
             </p>
@@ -155,7 +160,7 @@ export default function TaskPage({
         ) : null}
 
         {task.state === 'ABANDONED' ? (
-          <section className="mt-10 rounded-xl border border-line bg-surface p-8">
+          <section className="mt-10 rounded-[2rem] border border-line bg-surface p-8">
             <h2 className="font-display text-2xl text-ink">Set aside.</h2>
             <p className="mt-2 text-ink-muted">
               This task was closed without completing. Nothing was changed after your last
@@ -170,7 +175,7 @@ export default function TaskPage({
       <button
         type="button"
         onClick={() => setInspectOpen(true)}
-        className="fixed right-6 bottom-6 text-xs text-ink-subtle underline decoration-line-strong underline-offset-4 transition-colors hover:text-ink"
+        className="fixed right-6 bottom-6 rounded-full border border-line bg-surface/90 px-5 py-3 text-xs font-medium text-ink-subtle shadow-xl backdrop-blur-xl transition-colors hover:text-ink"
       >
         Inspect
       </button>
@@ -178,6 +183,7 @@ export default function TaskPage({
       {inspectOpen ? (
         <Inspector onClose={() => setInspectOpen(false)} task={task} events={bundle?.events ?? []} />
       ) : null}
+      </div>
     </main>
   );
 }
@@ -194,7 +200,7 @@ function FourLayers({
 }) {
   const before = task.staged?.before ?? null;
   return (
-    <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
+    <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-[2rem] border border-line bg-line sm:grid-cols-4">
       <Layer title="Goal">
         {task.constraints.length > 0 ? (
           <ul className="space-y-1">
@@ -241,7 +247,7 @@ function FourLayers({
 
 function Layer({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-surface p-4">
+    <div className="bg-surface p-5">
       <dt className="text-xs font-medium tracking-wide text-ink-subtle uppercase">{title}</dt>
       <dd className="mt-2 text-sm leading-relaxed text-ink">{children}</dd>
     </div>
@@ -285,7 +291,7 @@ function WorkingState({
   refresh: () => void;
 }) {
   return (
-    <section className="mt-10 rounded-xl border border-line bg-surface p-8">
+    <section className="mt-10 rounded-[2rem] border border-line bg-surface p-8 shadow-[0_20px_50px_-20px_rgba(25,26,28,0.12)]">
       <p className="text-ink-muted">
         {task.constraints.length === 0
           ? 'Proof is reading your request…'
@@ -329,9 +335,9 @@ function ApprovalCard({
   return (
     <section
       aria-labelledby="approval-heading"
-      className="mt-10 rounded-xl border border-cobalt-line bg-cobalt-soft/60 p-8"
+      className="mt-10 rounded-[2.5rem] border border-cobalt-line bg-cobalt-soft/60 p-8"
     >
-      <h2 id="approval-heading" className="font-display text-3xl text-ink">
+      <h2 id="approval-heading" className="font-display text-3xl tracking-tight text-ink">
         Ready to make this change?
       </h2>
 
@@ -394,7 +400,7 @@ function ApprovalCard({
           type="button"
           onClick={onApprove}
           disabled={busy}
-          className="rounded-md bg-cobalt px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-cobalt-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-cobalt px-8 py-3.5 text-sm font-medium text-white transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? 'Making the change…' : 'Make this change'}
         </button>
@@ -402,7 +408,7 @@ function ApprovalCard({
           type="button"
           onClick={onNotYet}
           disabled={busy}
-          className="rounded-md border border-line px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full border border-line bg-surface px-6 py-3.5 text-sm font-medium text-ink transition-colors hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-40"
         >
           Not yet
         </button>
@@ -452,9 +458,9 @@ function MismatchScreen({
 
   return (
     <section aria-labelledby="mismatch-heading" className="mt-10">
-      <div className="rounded-xl border border-mismatch-line bg-mismatch-soft p-8">
-        <h2 id="mismatch-heading" className="font-display text-3xl text-ink">
-          We caught a mismatch.
+      <div className="rounded-[2.5rem] border border-mismatch-line bg-mismatch-soft p-8">
+        <h2 id="mismatch-heading" className="font-display text-3xl tracking-tight text-ink">
+          Good thing we checked.
         </h2>
 
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
@@ -491,7 +497,8 @@ function MismatchScreen({
           {failed.length === 1
             ? `${failed[0]!.observed.toLowerCase().replace('total is', 'the price is')}`
             : 'part of what you asked for did not hold'}
-          . <strong className="text-ink">We haven’t called this complete.</strong>
+          . <strong className="text-ink">Proof is not calling this done.</strong> What happens
+          next is your choice, and every way forward is laid out below.
         </p>
       </div>
 
@@ -555,7 +562,7 @@ function RecoveryChoice({
   onChooseAlternate?: (optionId: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-5">
+    <div className="rounded-[2rem] border border-line bg-surface p-5 shadow-[0_12px_36px_rgba(25,26,28,0.06)]">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <p className="font-medium text-ink">{title}</p>
@@ -566,7 +573,7 @@ function RecoveryChoice({
             type="button"
             onClick={onClick}
             aria-expanded={expanded}
-            className="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-sunken"
+            className="rounded-full border border-line px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-sunken"
           >
             {expanded ? 'Hide rooms' : 'See rooms'}
           </button>
@@ -575,7 +582,7 @@ function RecoveryChoice({
             type="button"
             onClick={onClick}
             disabled={busy}
-            className="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full border border-line px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? 'Working…' : 'Choose'}
           </button>
@@ -604,7 +611,7 @@ function RecoveryChoice({
                 type="button"
                 disabled={busy}
                 onClick={() => onChooseAlternate?.(option.id)}
-                className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full border border-line px-4 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Prepare this
               </button>
@@ -628,8 +635,8 @@ function VerifiedState({
 }) {
   const observed = reservation ?? task.staged?.before ?? null;
   return (
-    <section className="mt-10 rounded-xl border border-verified-line bg-verified-soft p-8">
-      <h2 className="font-display text-4xl text-ink">Done. And checked.</h2>
+    <section className="mt-10 rounded-[2.5rem] border border-verified-line bg-verified-soft p-8">
+      <h2 className="font-display text-4xl tracking-tight text-ink">Done. And checked.</h2>
       {observed ? (
         <p className="mt-4 text-lg text-ink">
           {dayLabel(observed.checkIn)} · Room {observed.roomId} · ${observed.totalPrice}
@@ -641,7 +648,7 @@ function VerifiedState({
       </p>
       <Link
         href={`/workspace/${task.id}/proof`}
-        className="mt-6 inline-block rounded-md bg-cobalt px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-cobalt-hover"
+        className="mt-6 inline-block rounded-full bg-cobalt px-7 py-3.5 text-sm font-medium text-white transition hover:scale-[1.02]"
       >
         View proof
       </Link>
@@ -658,8 +665,8 @@ function AcceptedState({
 }) {
   const failed = task.verification!.verdicts.filter((v) => !v.satisfied);
   return (
-    <section className="mt-10 rounded-xl border border-caution-line bg-caution-soft p-8">
-      <h2 className="font-display text-3xl text-ink">Kept, with a difference.</h2>
+    <section className="mt-10 rounded-[2.5rem] border border-caution-line bg-caution-soft p-8">
+      <h2 className="font-display text-3xl tracking-tight text-ink">Kept, with a difference.</h2>
       <p className="mt-3 text-ink-muted">
         You chose to keep this result.{' '}
         {failed.length > 0
@@ -673,7 +680,7 @@ function AcceptedState({
       ) : null}
       <Link
         href={`/workspace/${task.id}/proof`}
-        className="mt-6 inline-block rounded-md border border-line px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-surface"
+        className="mt-6 inline-block rounded-full border border-line bg-surface px-6 py-3.5 text-sm font-medium text-ink transition-colors hover:bg-sunken"
       >
         View the record
       </Link>
@@ -689,7 +696,7 @@ function Timeline({ timeline }: { timeline: { label: string; at: string }[] }) {
     <section aria-labelledby="timeline-heading" className="mt-14 border-t border-line pt-8">
       <h2
         id="timeline-heading"
-        className="text-sm font-medium tracking-wide text-ink-subtle uppercase"
+        className="text-xs font-medium tracking-[0.18em] text-ink-subtle uppercase"
       >
         Timeline
       </h2>

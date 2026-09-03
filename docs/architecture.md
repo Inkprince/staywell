@@ -54,19 +54,21 @@ What is absent is the point: no `EXECUTING → VERIFIED` (you cannot skip the ch
 
 A deterministic world, seeded (`rng.ts`, mulberry32). Twenty-five rooms across three tiers; a calendar week; occupancy-driven yield pricing with four tiers (quiet → high demand, multiplier 1.0 → 1.3). Competing demand is a **seeded schedule of holds** that lands as the engine advances — the engine ticks only on mutating calls, so a quote is read-only and a commit can honestly reprice. Holds may never fill the last room, so a mismatch is always about price, never a dead end.
 
+Booking has a checkout: a fresh reservation is **held** (the room is honestly taken) and becomes **confirmed** when the guest picks one of the demo payment methods (`payReservation` — every method is simulated, nothing is charged; the paid/unpaid state is real and visible). Payment bumps the world revision like any other mutation, so a change staged against the unpaid world is honestly stale. A change of plan is not a payment event: amending a held reservation keeps it held.
+
 The canonical demo is emergent, not scripted: on seed 4 the quote is $294 at occupancy 0.72 (busy), and by commit time holds have landed and the same formula yields $319 (high demand). No special case in the code knows this number.
 
 ## The WebMCP surface (`src/webmcp`)
 
-See [webmcp.md](webmcp.md) for the full contract. In short: `registry.ts` derives the tool set from task state (so `verify_result` is genuinely *absent* until something was committed), `tools.ts` builds each tool to speak plain HTTP, `withheld.ts` keeps the approval nonce out of every tool response, and the polyfill (vendored, Apache-2.0, see `polyfill/NOTICE`) provides `document.modelContext` in browsers that don't ship it natively.
+See [webmcp.md](webmcp.md) for the full contract. In short: `registry.ts` derives the tool set from task state (so `verify_result` is genuinely *absent* until something was committed), `tools.ts` builds each tool to speak plain HTTP, `withheld.ts` keeps the approval nonce out of every tool response, and the polyfill (vendored, Apache-2.0, see `src/webmcp/polyfill/NOTICE`) provides `document.modelContext` in browsers that don't ship it natively.
 
 ## The pilot (`src/lib/pilot`, `src/app/api/pilot`)
 
-The built-in agent, so the demo needs no setup — designed as a stand-in for exactly what an external agent can do, with no privileges:
+The built-in **fallback** agent, so the demo needs no external agent — designed as a stand-in for exactly what an external agent can do, with no privileges, and clearly labelled as a fallback wherever the UI shows it (it runs server-side over HTTP, so its steps never appear in the WebMCP call log):
 
 - It talks plain HTTP to the app's own API routes (`forwardClient` replays requests from the server's own origin with the caller's cookies forwarded), so it meets the same 403s, the same validation, and the same gates as a browser session. The scripted test suite asserts this: only the read/plan/recover endpoints, never `/approve`, never `/decide`, never a verify.
-- Two engines: a deterministic scripted playbook (`scripted.ts` — regex constraint parsing with honest "I could not turn that request into checkable conditions" refusal) and, when `OPENAI_API_KEY` is set and a daily budget remains, the OpenAI Responses API (`openai.ts`) with a fixed system prompt — "You cannot approve a change, commit a change, or declare success" — falling back to the playbook on any provider failure.
-- Guard rails: per-IP token bucket (default 6/min), a global daily run cap (default 300), same-origin enforcement, streamed as NDJSON so the UI shows each step as it happens.
+- Two engines: a deterministic scripted playbook (`scripted.ts` — regex constraint parsing with honest "I could not turn that request into checkable conditions" refusal) and, when `OPENAI_API_KEY` is set and a daily budget remains, the OpenAI Responses API (`openai.ts`) with a fixed system prompt — "You cannot approve a change, commit a change, or declare success" — falling back to the playbook on any provider failure. A third engine, `groq.ts`, plays the same role on Groq's `openai/gpt-oss-20b` behind `GROQ_API_KEY` (used when no OpenAI key or budget is available); the fixed prompt, tool surface, and HTTP-only execution are shared in `engine-tools.ts`, so the engine choice changes the model, never the powers. None of them is the verifier — checking stays deterministic.
+- Guard rails: per-IP token bucket (default 6/min), a global daily run cap per provider (default 300 each), same-origin enforcement, streamed as NDJSON so the UI shows each step as it happens.
 
 ## The evals (`evals/`)
 

@@ -1,6 +1,6 @@
 # Eval report
 
-Generated 2026-09-03T13:21:44.295Z by `pnpm evals` — deterministic by seed; the same run always produces the same numbers.
+Generated 2026-09-04T05:30:26.995Z by `pnpm evals` — deterministic by seed; the same run always produces the same numbers.
 
 **59 scenarios** across 11 categories (7 basic, 6 constraint, 3 conflict, 4 human-intervention, 3 stale-state, 2 failure, 5 recovery, 8 safety, 5 verification, 4 adversarial, 12 seed-sweep).
 

@@ -315,6 +315,9 @@ class ToolRegistry {
   async #register(descriptor: ToolDescriptor): Promise<void> {
     if (!this.#ctx) return;
 
+    // Canonical WebMCP form (per the challenge rules):
+    // document.modelContext.registerTool({ name, description, inputSchema, execute }, { signal })
+    // `this.#ctx` below IS that document.modelContext (or its polyfill), resolved in adapter.ts.
     const signature = signatureFor(descriptor);
     const register = () => {
       const controller = new AbortController();

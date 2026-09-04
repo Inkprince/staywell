@@ -23,7 +23,7 @@ const RESERVATIONS = '/reservations' as Route;
  * The tour video on YouTube. Set the id when it goes live; until then
  * the frame shows a poster.
  */
-const VIDEO_ID = '';
+const VIDEO_ID = 'yqiNwh98KiU';
 
 /**
  * The hero: full-bleed and a full viewport tall, the headline earns the click
